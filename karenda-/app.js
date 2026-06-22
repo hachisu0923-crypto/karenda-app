@@ -159,15 +159,9 @@ function normalCats() { return categories.filter(c => c.type !== 'shift'); }
 function shiftCats()  { return categories.filter(c => c.type === 'shift'); }
 function isShift(id)  { return getCat(id)?.type === 'shift'; }
 
-// スマホ縦幅のとき、月表示のセル内は省スペースのため「開始時刻だけ」を表示する
+// スマホ幅（モバイル UI）かどうか。月表示の簡素化などに使用。
 function isNarrowScreen() {
   return window.matchMedia && window.matchMedia('(max-width: 720px)').matches;
-}
-
-function shortStartTime(rangeOrTime) {
-  if (!rangeOrTime) return '';
-  // "10:00–11:00" / "10:00-11:00" / "10:00" → "10:00"
-  return String(rangeOrTime).split(/[–-]/)[0].trim();
 }
 
 function catCounts() {
@@ -1421,17 +1415,23 @@ function buildCell(y,m,d,isOther,isToday) {
       pill.className='event-pill'+(isShift(ev.catId)?' is-shift':'');
       pill.style.background=cat.color;
       if (isShift(ev.catId)&&ev.shiftStart) {
-        const t = isNarrowScreen() ? shortStartTime(ev.shiftStart) : `${ev.shiftStart}–${ev.shiftEnd}`;
-        pill.innerHTML=`<span class="event-pill-time">${t}</span>
-                        <span class="event-pill-name">${escHtml(cat.name)}</span>`;
+        if (isNarrowScreen()) {
+          // 月表示は時刻を出さず簡素化（色ピル＋ドット＋名称）。時刻は週/日/詳細で確認。
+          pill.innerHTML=`<span class="event-pill-dot"></span><span class="event-pill-name">${escHtml(cat.name)}</span>`;
+        } else {
+          pill.innerHTML=`<span class="event-pill-time">${ev.shiftStart}–${ev.shiftEnd}</span><span class="event-pill-name">${escHtml(cat.name)}</span>`;
+        }
       } else {
-        const pillTime = ev.time
-          ? (ev.timeEnd ? `${ev.time}–${ev.timeEnd}` : ev.time)
-          : '';
-        const t = isNarrowScreen() ? shortStartTime(pillTime) : pillTime;
-        pill.innerHTML=t
-          ?`<span class="event-pill-time">${t}</span><span class="event-pill-name">${escHtml(ev.title)}</span>`
-          :`<span class="event-pill-dot"></span><span class="event-pill-name">${escHtml(ev.title)}</span>`;
+        if (isNarrowScreen()) {
+          pill.innerHTML=`<span class="event-pill-dot"></span><span class="event-pill-name">${escHtml(ev.title)}</span>`;
+        } else {
+          const pillTime = ev.time
+            ? (ev.timeEnd ? `${ev.time}–${ev.timeEnd}` : ev.time)
+            : '';
+          pill.innerHTML=pillTime
+            ?`<span class="event-pill-time">${pillTime}</span><span class="event-pill-name">${escHtml(ev.title)}</span>`
+            :`<span class="event-pill-dot"></span><span class="event-pill-name">${escHtml(ev.title)}</span>`;
+        }
       }
       pill.addEventListener('click',e=>{e.stopPropagation();openDayModal(y,m,d);});
       if (ev._dbId) {

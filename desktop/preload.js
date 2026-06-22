@@ -1,18 +1,26 @@
 'use strict';
 
 /**
- * Electron preload — レンダラ（karenda- の Web アプリ）に最小限の OAuth ブリッジを公開する。
- * contextIsolation 有効下で安全に橋渡しする（Node API はレンダラに露出しない）。
+ * Electron preload — レンダラ（shell.html とその中の karenda- iframe）に最小限の
+ * ブリッジを公開する。contextIsolation 有効下で安全に橋渡しする（Node API は露出しない）。
  *
- * window.electronOAuth の存在を以て app.js は「Electron 上で動作中」と判定し、
- * Google ログインを PKCE + 外部ブラウザ方式に切り替える。Web ブラウザでは
- * このオブジェクトは存在しないため、Web 版の挙動は一切変わらない。
+ * nodeIntegrationInSubFrames:true により、この preload は iframe（カレンダー本体）にも
+ * 注入される。そのため iframe 内の app.js は従来どおり window.electronOAuth を参照でき、
+ * Google ログイン（PKCE + 規定ブラウザ）がそのまま機能する。
  */
 
 const { contextBridge, ipcRenderer } = require('electron');
 
+// Google OAuth ブリッジ（iframe 内の app.js が使用）
 contextBridge.exposeInMainWorld('electronOAuth', {
-  // 認可 URL を OS の規定ブラウザで開き、/oauth-callback の受信を待って
-  // { code } または { error } を返す。
   openExternalAuth: (url) => ipcRenderer.invoke('oauth:openExternalAuth', url)
+});
+
+// ウィンドウ操作ブリッジ（shell.html の枠が使用）
+contextBridge.exposeInMainWorld('electronControls', {
+  minimize:  () => ipcRenderer.invoke('win:minimize'),
+  close:     () => ipcRenderer.invoke('win:close'),
+  dragStart: () => ipcRenderer.send('win:dragStart'),
+  dragMove:  (dx, dy) => ipcRenderer.send('win:dragMove', dx, dy),
+  dragEnd:   () => ipcRenderer.send('win:dragEnd')
 });

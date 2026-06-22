@@ -44,6 +44,17 @@ const SYNTH_SRC = `(function () {
   window.__karSwipeSynthInstalled = true;
   if (typeof window.TouchEvent !== 'function' || typeof window.Touch !== 'function') return;
 
+  // スワイプ（マウスドラッグ）で本文テキストが選択されるのを防ぐ。
+  // 入力欄/テキストエリア/編集要素では選択・編集を維持する。
+  try {
+    var st = document.createElement('style');
+    st.textContent =
+      'html,body{-webkit-user-select:none;user-select:none;}' +
+      'input,textarea,select,[contenteditable],[contenteditable=""],[contenteditable="true"]' +
+      '{-webkit-user-select:text;user-select:text;}';
+    (document.head || document.documentElement).appendChild(st);
+  } catch (err) { /* ignore */ }
+
   var pressed = false, startTarget = null, lastX = 0, lastY = 0, idCounter = 1, identifier = 1;
 
   function makeTouch(target, x, y) {
@@ -71,8 +82,9 @@ const SYNTH_SRC = `(function () {
 
   document.addEventListener('mousedown', function (e) {
     if (e.button !== 0) return;
-    // 予定のドラッグ＆ドロップ（ネイティブ DnD）は尊重し、合成しない
-    if (e.target && e.target.closest && e.target.closest('[draggable="true"], .event-pill')) return;
+    // 予定のドラッグ＆ドロップ（ネイティブ DnD）と、入力欄/編集要素は合成しない
+    // （フィールド内のドラッグはネイティブの選択・編集をそのまま使う）
+    if (e.target && e.target.closest && e.target.closest('[draggable="true"], .event-pill, input, textarea, select, [contenteditable], [contenteditable=""], [contenteditable="true"]')) return;
     pressed = true; startTarget = e.target;
     lastX = e.clientX; lastY = e.clientY; identifier = idCounter++;
     var t = makeTouch(startTarget, lastX, lastY);

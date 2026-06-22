@@ -11,9 +11,14 @@
  *   画面部分       = <iframe src="/">（カレンダー本体、論理幅 390px = 常にスマホ UI）
  */
 
-const { app, BrowserWindow, shell, ipcMain, screen } = require('electron');
+const { app, BrowserWindow, shell, ipcMain, screen, webFrameMain } = require('electron');
 const path = require('path');
 const { startStaticServer } = require('./static-server');
+
+// マウスのドラッグを「指スワイプ」として扱えるよう、タッチ API（TouchEvent/Touch
+// コンストラクタ）を有効化する。タッチ非搭載 PC でもコンストラクタが使えるようになる。
+// 実際のマウス→タッチ変換は SYNTH_SRC を iframe に注入して行う（下記）。
+app.commandLine.appendSwitch('touch-events', 'enabled');
 
 // ── iPhone デバイス寸法（shell.html と一致させること）──
 const SCREEN_W = 390, SCREEN_H = 844;   // iframe（画面）論理サイズ＝常にスマホ UI
@@ -30,6 +35,67 @@ let mainWindow = null;
 let staticServer = null;
 let waitForOAuthCallback = null;   // static-server が提供する one-shot 待受
 let _dragOrigin = null;            // ウィンドウドラッグ移動の基準
+
+// カレンダー本体の iframe（メインワールド）に注入する「マウス→タッチ変換器」。
+// 左ボタンのドラッグを touchstart/touchmove/touchend に変換し、指スワイプと同じ
+// 操作を可能にする。予定の移動（HTML5 ネイティブ DnD = draggable 要素）は除外する。
+const SYNTH_SRC = `(function () {
+  if (window.__karSwipeSynthInstalled) return;
+  window.__karSwipeSynthInstalled = true;
+  if (typeof window.TouchEvent !== 'function' || typeof window.Touch !== 'function') return;
+
+  var pressed = false, startTarget = null, lastX = 0, lastY = 0, idCounter = 1, identifier = 1;
+
+  function makeTouch(target, x, y) {
+    return new Touch({
+      identifier: identifier, target: target,
+      clientX: x, clientY: y,
+      pageX: x + window.scrollX, pageY: y + window.scrollY,
+      screenX: x, screenY: y,
+      radiusX: 1, radiusY: 1, rotationAngle: 0, force: 1
+    });
+  }
+  function fire(type, target, touches, changed) {
+    try {
+      target.dispatchEvent(new TouchEvent(type, {
+        touches: touches, targetTouches: touches, changedTouches: changed,
+        bubbles: true, cancelable: true, composed: true, view: window
+      }));
+    } catch (err) { /* ignore */ }
+  }
+  function endGesture() {
+    if (!pressed) return;
+    fire('touchend', startTarget, [], [makeTouch(startTarget, lastX, lastY)]);
+    pressed = false; startTarget = null;
+  }
+
+  document.addEventListener('mousedown', function (e) {
+    if (e.button !== 0) return;
+    // 予定のドラッグ＆ドロップ（ネイティブ DnD）は尊重し、合成しない
+    if (e.target && e.target.closest && e.target.closest('[draggable="true"], .event-pill')) return;
+    pressed = true; startTarget = e.target;
+    lastX = e.clientX; lastY = e.clientY; identifier = idCounter++;
+    var t = makeTouch(startTarget, lastX, lastY);
+    fire('touchstart', startTarget, [t], [t]);
+  }, true);
+
+  window.addEventListener('mousemove', function (e) {
+    if (!pressed) return;
+    if (e.buttons === 0) { endGesture(); return; }   // mouseup 取りこぼし回復
+    lastX = e.clientX; lastY = e.clientY;
+    var t = makeTouch(startTarget, lastX, lastY);
+    fire('touchmove', startTarget, [t], [t]);
+  }, true);
+
+  window.addEventListener('mouseup', function (e) {
+    if (!pressed) return;
+    if (e.button === 0) { lastX = e.clientX; lastY = e.clientY; }
+    endGesture();   // ネイティブ click より先に touchend を出す
+  }, true);
+
+  window.addEventListener('blur', endGesture, true);
+  document.addEventListener('pointercancel', endGesture, true);
+})();`;
 
 /** 配信ルート（karenda-）の解決：開発時とパッケージ時で異なる */
 function resolveWebRoot() {
@@ -90,6 +156,21 @@ async function createWindow() {
       if (/^https?:\/\//i.test(target)) shell.openExternal(target);
     }
   });
+
+  // マウス→タッチ変換器を、カレンダー本体の iframe（子フレーム）のメインワールドへ注入。
+  // シェル（メインフレーム）には注入しない＝ベゼルのウィンドウ移動はそのまま。
+  const injectInto = (isMainFrame, pid, rid) => {
+    if (isMainFrame) return;
+    let frame;
+    try { frame = webFrameMain.fromId(pid, rid); } catch (_) { return; }
+    if (!frame || typeof frame.url !== 'string') return;
+    if (!frame.url.startsWith(url) || frame.url.includes('/__shell')) return;
+    frame.executeJavaScript(SYNTH_SRC, true).catch(() => {});
+  };
+  mainWindow.webContents.on('did-frame-finish-load',
+    (_e, isMainFrame, pid, rid) => injectInto(isMainFrame, pid, rid));
+  mainWindow.webContents.on('did-frame-navigate',
+    (_e, _u, _code, _status, isMainFrame, pid, rid) => injectInto(isMainFrame, pid, rid));
 
   mainWindow.loadURL(`${url}/__shell?scale=${scale}`);
 

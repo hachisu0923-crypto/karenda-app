@@ -138,10 +138,18 @@
 
   <script>
     (function () {
-      // ?scale= に応じてデバイス全体を縮小（iframe の論理幅は 390 のまま＝スマホ UI 維持）
-      var scale = parseFloat(new URLSearchParams(location.search).get('scale'));
-      if (!(scale > 0) || scale > 1) scale = 1;
-      document.getElementById('stage').style.transform = 'scale(' + scale + ')';
+      // デバイス全体をウィンドウサイズにフィットさせる（アスペクト比は main 側で固定済み）。
+      // iframe の論理幅は 390 のまま＝スマホ UI を維持したまま拡大縮小する。
+      var stage = document.getElementById('stage');
+      function fitStage() {
+        var baseW = stage.offsetWidth || 490;   // .stage の論理サイズ（CSS の --stage-w/h）
+        var baseH = stage.offsetHeight || 960;
+        var s = Math.min(window.innerWidth / baseW, window.innerHeight / baseH);
+        if (!(s > 0)) s = 1;
+        stage.style.transform = 'scale(' + s + ')';
+      }
+      fitStage();
+      window.addEventListener('resize', fitStage);
 
       // ── iPhone 風ステータス時計（24時間表記・先頭ゼロなし）──
       var clockEl = document.getElementById('status-clock');

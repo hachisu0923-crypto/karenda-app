@@ -148,8 +148,8 @@ async function createWindow() {
     frame: false,                 // iPhone 風：OS の枠を消す
     transparent: true,            // 角丸・影のために透過
     hasShadow: false,             // native 影は使わず CSS 影を描く
-    resizable: false,
-    maximizable: false,
+    resizable: true,              // アスペクト比を保ったまま拡大縮小可
+    maximizable: false,           // 最大化はアスペクト比を崩すので無効
     fullscreenable: false,
     backgroundColor: '#00000000', // 完全透過
     title: 'My Calendar',
@@ -161,6 +161,11 @@ async function createWindow() {
       spellcheck: false
     }
   });
+
+  // アスペクト比を iPhone 枠（STAGE_W:STAGE_H）に固定したままリサイズ可能にする
+  mainWindow.setAspectRatio(STAGE_W / STAGE_H);
+  // 小さくしすぎないよう下限を設定（上限は画面サイズに任せる）
+  mainWindow.setMinimumSize(Math.round(STAGE_W * 0.4), Math.round(STAGE_H * 0.4));
 
   // 外部リンク（target="_blank" / Anthropic コンソール等）は OS ブラウザで開く
   mainWindow.webContents.setWindowOpenHandler(({ url: target }) => {

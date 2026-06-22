@@ -8,7 +8,7 @@
  * Web アプリ側のコードは一切変更しない。
  */
 
-const { app, BrowserWindow, shell } = require('electron');
+const { app, BrowserWindow, shell, ipcMain } = require('electron');
 const path = require('path');
 const { startStaticServer } = require('./static-server');
 
@@ -21,6 +21,7 @@ const MAX_HEIGHT = 4000;    // 高さは実質無制限
 
 let mainWindow = null;
 let staticServer = null;
+let waitForOAuthCallback = null;   // static-server が提供する one-shot 待受
 
 /** 配信ルート（karenda-）の解決：開発時とパッケージ時で異なる */
 function resolveWebRoot() {
@@ -33,8 +34,10 @@ function resolveWebRoot() {
 
 async function createWindow() {
   const webRoot = resolveWebRoot();
-  const { server, url } = await startStaticServer(webRoot);
+  const started = await startStaticServer(webRoot);
+  const { server, url } = started;
   staticServer = server;
+  waitForOAuthCallback = started.waitForOAuthCallback;
 
   mainWindow = new BrowserWindow({
     width: PHONE_WIDTH,
@@ -44,6 +47,7 @@ async function createWindow() {
     backgroundColor: '#ffffff',
     title: 'My Calendar',
     webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
       spellcheck: false
@@ -74,6 +78,29 @@ async function createWindow() {
 
   mainWindow.on('closed', () => { mainWindow = null; });
 }
+
+// ── Google OAuth ブリッジ ──────────────────────────────────────────────
+// レンダラ（preload 経由）から認可 URL を受け取り、規定ブラウザで開いて
+// /oauth-callback の受信を待ち、{ code } または { error } を返す。
+ipcMain.handle('oauth:openExternalAuth', async (_e, authUrl) => {
+  if (typeof authUrl !== 'string' || !/^https?:\/\//i.test(authUrl)) {
+    return { error: 'invalid_url' };
+  }
+  if (!waitForOAuthCallback) return { error: 'server_not_ready' };
+  const pending = waitForOAuthCallback();   // ブラウザを開く前に待受を開始（取りこぼし防止）
+  try {
+    await shell.openExternal(authUrl);
+  } catch (e) {
+    return { error: 'open_external_failed' };
+  }
+  const result = await pending;
+  // 認証後はアプリを前面に戻す
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+  }
+  return result;
+});
 
 // 多重起動防止
 const gotLock = app.requestSingleInstanceLock();

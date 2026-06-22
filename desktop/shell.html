@@ -109,6 +109,7 @@
   }
   .win-btn:hover { background: rgba(120, 120, 128, 0.6); }
   .win-btn.is-close:hover { background: #e03131; }
+  .win-btn.is-pin.is-active { background: #f0a020; color: #fff; }  /* 最前面固定 ON */
   .win-btn svg { width: 11px; height: 11px; display: block; }
 </style>
 </head>
@@ -123,6 +124,9 @@
       </div>
     </div>
     <div class="win-controls">
+      <button class="win-btn is-pin" id="btn-pin" title="最前面に固定" aria-label="最前面に固定" aria-pressed="false">
+        <svg viewBox="0 0 12 12"><path d="M5 1h2v3.6l1.8 1.8V8H3.2V6.4L5 4.6V1z" fill="currentColor"/><line x1="6" y1="8" x2="6" y2="11" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+      </button>
       <button class="win-btn is-min" id="btn-min" title="最小化" aria-label="最小化">
         <svg viewBox="0 0 12 12"><line x1="2" y1="6" x2="10" y2="6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
       </button>
@@ -155,6 +159,23 @@
       var btnClose = document.getElementById('btn-close');
       if (btnMin)   btnMin.addEventListener('click', function () { ctl.minimize && ctl.minimize(); });
       if (btnClose) btnClose.addEventListener('click', function () { ctl.close && ctl.close(); });
+
+      // ── 最前面に固定（always-on-top）トグル。状態は localStorage に保存し再起動後も復元 ──
+      var btnPin = document.getElementById('btn-pin');
+      var pinned = localStorage.getItem('karPinTop') === '1';
+      function applyPin() {
+        if (btnPin) {
+          btnPin.classList.toggle('is-active', pinned);
+          btnPin.setAttribute('aria-pressed', pinned ? 'true' : 'false');
+        }
+        if (ctl.setAlwaysOnTop) ctl.setAlwaysOnTop(pinned);
+      }
+      applyPin();   // 起動時に保存値を復元・適用
+      if (btnPin) btnPin.addEventListener('click', function () {
+        pinned = !pinned;
+        localStorage.setItem('karPinTop', pinned ? '1' : '0');
+        applyPin();
+      });
 
       // ── ベゼルのドラッグでウィンドウ移動（CSS transform 下でも安定する手動実装）──
       var phone = document.getElementById('phone');

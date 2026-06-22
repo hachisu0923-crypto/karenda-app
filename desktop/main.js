@@ -201,6 +201,11 @@ async function createWindow() {
 // ── ウィンドウ操作（frameless のため独自に提供）──────────────────────────
 ipcMain.handle('win:minimize', () => { if (mainWindow) mainWindow.minimize(); });
 ipcMain.handle('win:close',    () => { if (mainWindow) mainWindow.close(); });
+// 常に最前面（always-on-top）の ON/OFF。シェルのピンボタンから切替・復元される。
+ipcMain.handle('win:setAlwaysOnTop', (_e, flag) => {
+  if (mainWindow) mainWindow.setAlwaysOnTop(!!flag);
+  return !!flag;
+});
 
 // ベゼルのドラッグでウィンドウ移動（CSS transform 下でも安定するよう手動実装）
 ipcMain.on('win:dragStart', () => {

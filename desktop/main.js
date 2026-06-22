@@ -78,6 +78,10 @@ const SYNTH_SRC = `(function () {
     if (!pressed) return;
     fire('touchend', startTarget, [], [makeTouch(startTarget, lastX, lastY)]);
     pressed = false; startTarget = null;
+    clearSelection();
+  }
+  function clearSelection() {
+    try { var s = window.getSelection(); if (s && !s.isCollapsed) s.removeAllRanges(); } catch (e2) { /* ignore */ }
   }
 
   document.addEventListener('mousedown', function (e) {
@@ -97,6 +101,7 @@ const SYNTH_SRC = `(function () {
     lastX = e.clientX; lastY = e.clientY;
     var t = makeTouch(startTarget, lastX, lastY);
     fire('touchmove', startTarget, [t], [t]);
+    clearSelection();   // ドラッグ中に選択が出ないよう即クリア
   }, true);
 
   window.addEventListener('mouseup', function (e) {
@@ -107,6 +112,10 @@ const SYNTH_SRC = `(function () {
 
   window.addEventListener('blur', endGesture, true);
   document.addEventListener('pointercancel', endGesture, true);
+
+  // ドラッグ中のテキスト選択を能動的に止める（後付け user-select だけでは効かない環境向け）。
+  // pressed は本文ドラッグ時のみ true なので、入力欄/編集要素・通常クリックには影響しない。
+  document.addEventListener('selectstart', function (e) { if (pressed) e.preventDefault(); }, true);
 })();`;
 
 /** 配信ルート（karenda-）の解決：開発時とパッケージ時で異なる */

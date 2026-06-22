@@ -1,0 +1,56 @@
+{
+  "name": "karenda-desktop",
+  "version": "1.0.0",
+  "description": "My Calendar (karenda) — Windows desktop wrapper (mobile/phone layout)",
+  "main": "main.js",
+  "author": "karenda",
+  "license": "MIT",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hachisu0923-crypto/karenda-app.git"
+  },
+  "scripts": {
+    "start": "electron .",
+    "make-icon": "node scripts/make-icon.js",
+    "dist": "node scripts/make-icon.js && electron-builder --win -p never",
+    "pack": "node scripts/make-icon.js && electron-builder --win --dir"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8",
+    "png-to-ico": "^2.1.7"
+  },
+  "build": {
+    "appId": "app.mycalendar.karenda",
+    "productName": "My Calendar",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "static-server.js",
+      "scripts/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../karenda-",
+        "to": "app-web",
+        "filter": ["**/*"]
+      }
+    ],
+    "win": {
+      "target": ["nsis", "portable"]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "My Calendar"
+    },
+    "portable": {
+      "artifactName": "MyCalendar-${version}-portable.exe"
+    }
+  }
+}

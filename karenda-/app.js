@@ -164,6 +164,28 @@ function isNarrowScreen() {
   return window.matchMedia && window.matchMedia('(max-width: 720px)').matches;
 }
 
+// 月セル用：開始時刻 "HH:MM" を指す小さなアナログ時計アイコン。
+// 文字盤の色で時間帯を示す（午前 0:00–11:59 = オレンジ / 午後・夜 12:00–23:59 = 青）。針のみ。
+function clockGlyph(hhmm) {
+  const mt = /^(\d{1,2}):(\d{2})$/.exec(String(hhmm || '').trim());
+  if (!mt) return '';
+  const h = +mt[1], mn = +mt[2];
+  const cls = h < 12 ? 'is-am' : 'is-pm';
+  const minAng = mn * 6;                 // 分針: 360/60
+  const hrAng  = (h % 12) * 30 + mn * 0.5; // 時針: 360/12 + 分の寄与
+  const pt = (a, l) => {
+    const r = (a - 90) * Math.PI / 180;
+    return [(8 + l * Math.cos(r)).toFixed(1), (8 + l * Math.sin(r)).toFixed(1)];
+  };
+  const [hx, hy] = pt(hrAng, 3.1);
+  const [mx, my] = pt(minAng, 4.8);
+  return `<svg class="event-pill-clock ${cls}" viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">`
+    + `<circle class="epc-face" cx="8" cy="8" r="7" stroke="rgba(0,0,0,0.3)" stroke-width="0.5"/>`
+    + `<line x1="8" y1="8" x2="${hx}" y2="${hy}" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/>`
+    + `<line x1="8" y1="8" x2="${mx}" y2="${my}" stroke="#fff" stroke-width="1" stroke-linecap="round"/>`
+    + `<circle cx="8" cy="8" r="0.9" fill="#fff"/></svg>`;
+}
+
 function catCounts() {
   // カテゴリ別の「今月の予定数」を集計（サイドバー表示用）
   const y = curDate.getFullYear();
@@ -1416,14 +1438,16 @@ function buildCell(y,m,d,isOther,isToday) {
       pill.style.background=cat.color;
       if (isShift(ev.catId)&&ev.shiftStart) {
         if (isNarrowScreen()) {
-          // 月表示は時刻を出さず簡素化（色ピル＋ドット＋名称）。時刻は週/日/詳細で確認。
-          pill.innerHTML=`<span class="event-pill-dot"></span><span class="event-pill-name">${escHtml(cat.name)}</span>`;
+          // 月表示は開始時刻を小さなアナログ時計で表す（午前=オレンジ/午後・夜=青の文字盤）。
+          const g = clockGlyph(ev.shiftStart) || '<span class="event-pill-dot"></span>';
+          pill.innerHTML=`${g}<span class="event-pill-name">${escHtml(cat.name)}</span>`;
         } else {
           pill.innerHTML=`<span class="event-pill-time">${ev.shiftStart}–${ev.shiftEnd}</span><span class="event-pill-name">${escHtml(cat.name)}</span>`;
         }
       } else {
         if (isNarrowScreen()) {
-          pill.innerHTML=`<span class="event-pill-dot"></span><span class="event-pill-name">${escHtml(ev.title)}</span>`;
+          const g = (ev.time ? clockGlyph(ev.time) : '') || '<span class="event-pill-dot"></span>';
+          pill.innerHTML=`${g}<span class="event-pill-name">${escHtml(ev.title)}</span>`;
         } else {
           const pillTime = ev.time
             ? (ev.timeEnd ? `${ev.time}–${ev.timeEnd}` : ev.time)

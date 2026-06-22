@@ -74,10 +74,12 @@ function _listen(server, port) {
 /**
  * 指定ディレクトリを配信するサーバを起動する。
  * @param {string} rootDir 配信ルート（karenda- の絶対パス）
+ * @param {string} [shellPath] iPhone 風フレーム shell.html の絶対パス（/__shell で配信）
  * @returns {Promise<{server: http.Server, port: number, url: string, waitForOAuthCallback: Function}>}
  */
-async function startStaticServer(rootDir) {
+async function startStaticServer(rootDir, shellPath) {
   const root = path.resolve(rootDir);
+  const shellFile = shellPath ? path.resolve(shellPath) : null;
 
   // OAuth コールバック待ち受け（one-shot）
   let _pendingResolve = null;
@@ -94,6 +96,17 @@ async function startStaticServer(rootDir) {
       parsed = new URL(req.url || '/', 'http://127.0.0.1');
     } catch (_) {
       res.writeHead(400); res.end('Bad Request'); return;
+    }
+
+    // ── iPhone 風フレーム shell（root 外のファイルを配信。SW スコープと無関係）──
+    if (parsed.pathname === '/__shell') {
+      if (!shellFile) { res.writeHead(404); res.end('No shell configured'); return; }
+      fs.readFile(shellFile, (e, data) => {
+        if (e) { res.writeHead(500); res.end('shell read error'); return; }
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+        res.end(data);
+      });
+      return;
     }
 
     // ── OAuth コールバック（ファイル探索の前に短絡）──

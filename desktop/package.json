@@ -30,6 +30,7 @@
     },
     "files": [
       "main.js",
+      "preload.js",
       "static-server.js",
       "scripts/**/*"
     ],

@@ -54,7 +54,13 @@ if (!_sb || typeof _sb.createClient !== 'function') {
   console.error('Supabase SDK not loaded. Check the <script> tag for @supabase/supabase-js.');
 }
 const { createClient } = _sb || {};
-const db = createClient ? createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+// Electron デスクトップ版（window.electronOAuth が preload で注入される）では
+// Google ログインを PKCE フローで行うため flowType を切り替える。
+// Web ブラウザでは _electronAuthOpts は undefined となり、従来どおりの挙動。
+const _electronAuthOpts = (typeof window !== 'undefined' && window.electronOAuth)
+  ? { auth: { flowType: 'pkce', detectSessionInUrl: false } }
+  : undefined;
+const db = createClient ? createClient(SUPABASE_URL, SUPABASE_KEY, _electronAuthOpts) : null;
 
 function ensureDb(){
   if(db) return true;
@@ -1118,6 +1124,35 @@ document.getElementById('js-auth-google').addEventListener('click', async () => 
   setAuthLoading(true);
   showAuthMsg('');
   try {
+    // ── Electron デスクトップ版: PKCE + 規定ブラウザ + ループバック ──
+    // Google は埋め込みブラウザでの OAuth を拒否するため、認可 URL を規定ブラウザで開き、
+    // http://127.0.0.1:<port>/oauth-callback に戻ってきた code を交換する。
+    if (window.electronOAuth) {
+      const { data, error } = await db.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          skipBrowserRedirect: true,
+          redirectTo: window.location.origin + '/oauth-callback',
+          queryParams: { access_type: 'offline', prompt: 'consent' }
+        }
+      });
+      if (error) throw error;
+      if (!data?.url) throw new Error('認可URLを取得できませんでした');
+      showAuthMsg('ブラウザでGoogleログインを続けてください…', false);
+      const res = await window.electronOAuth.openExternalAuth(data.url);
+      if (res?.error) {
+        throw new Error(res.error === 'timeout'
+          ? 'タイムアウトしました。もう一度お試しください。'
+          : 'Googleログインがキャンセルまたは失敗しました');
+      }
+      if (!res?.code) throw new Error('認証コードを取得できませんでした');
+      const { error: exErr } = await db.auth.exchangeCodeForSession(res.code);
+      if (exErr) throw exErr;
+      // onAuthStateChange (SIGNED_IN) → showApp() が発火する
+      return;
+    }
+
+    // ── Web ブラウザ版（従来どおり）──
     const { error } = await db.auth.signInWithOAuth({
       provider: 'google',
       options: {

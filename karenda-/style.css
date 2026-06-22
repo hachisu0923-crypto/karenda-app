@@ -2488,15 +2488,15 @@ input  { font-family: inherit; }
     border-radius: 4px;
   }
 
-  /* Event pills: readable on mobile（9.5px → 11.5px） */
+  /* Event pills: compact text on mobile（タイトルは 6px） */
   .event-pill {
     padding: 3px 6px;
-    font-size: 11.5px;
+    font-size: 6px;
     gap: 4px;
     min-height: 18px;
   }
   .event-pill-time { font-size: 10px; }
-  .event-pill-name { font-size: 11px; }
+  .event-pill-name { font-size: 6px; }
 
   .more-badge { font-size: 10px; padding: 2px 5px; }
 

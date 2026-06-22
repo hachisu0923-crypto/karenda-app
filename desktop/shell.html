@@ -73,13 +73,18 @@
     pointer-events: none;
   }
 
-  /* iPhone 風ステータス時計（上ベゼル右側） */
+  /* iPhone 風ステータス時計（ディスプレイ内・右上のステータスバー位置） */
   .status-clock {
     position: absolute;
-    top: 9px; right: 26px;
+    top: 12px; right: 18px;
     z-index: 6;
+    padding: 2px 9px;
+    border-radius: 11px;
+    background: rgba(0, 0, 0, 0.32);
+    -webkit-backdrop-filter: blur(3px);
+    backdrop-filter: blur(3px);
     color: #fff;
-    font: 600 13px/1 -apple-system, "SF Pro Text", "Helvetica Neue",
+    font: 600 13px/1.4 -apple-system, "SF Pro Text", "Helvetica Neue",
           "Hiragino Kaku Gothic ProN", "Noto Sans JP", Arial, sans-serif;
     letter-spacing: 0.3px;
     font-variant-numeric: tabular-nums;
@@ -111,10 +116,10 @@
   <div class="stage" id="stage">
     <div class="phone" id="phone">
       <div class="island"></div>
-      <div class="status-clock" id="status-clock"></div>
       <div class="screen">
         <iframe id="appframe" src="/" title="My Calendar"
                 allow="clipboard-write; camera"></iframe>
+        <div class="status-clock" id="status-clock"></div>
       </div>
     </div>
     <div class="win-controls">

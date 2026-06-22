@@ -1174,6 +1174,11 @@ input  { font-family: inherit; }
 .day-cell.is-sat .day-num   { color: var(--color-sat); }
 .day-cell.is-today .day-num { color: #fff !important; }
 
+/* 日付番号＋その日の予定時刻（時計アイコン）の横並び行 */
+.day-head { display: flex; align-items: center; gap: 2px; min-width: 0; }
+.day-clocks { display: flex; flex-wrap: wrap; align-items: center; gap: 1px; min-width: 0; overflow: hidden; }
+.day-clocks .event-pill-clock { width: 11px; height: 11px; }
+
 /* — Task pills on calendar cell — */
 .day-tasks {
   display: flex;

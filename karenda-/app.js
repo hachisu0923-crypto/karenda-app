@@ -159,15 +159,31 @@ function normalCats() { return categories.filter(c => c.type !== 'shift'); }
 function shiftCats()  { return categories.filter(c => c.type === 'shift'); }
 function isShift(id)  { return getCat(id)?.type === 'shift'; }
 
-// スマホ縦幅のとき、月表示のセル内は省スペースのため「開始時刻だけ」を表示する
+// スマホ幅（モバイル UI）かどうか。月表示の簡素化などに使用。
 function isNarrowScreen() {
   return window.matchMedia && window.matchMedia('(max-width: 720px)').matches;
 }
 
-function shortStartTime(rangeOrTime) {
-  if (!rangeOrTime) return '';
-  // "10:00–11:00" / "10:00-11:00" / "10:00" → "10:00"
-  return String(rangeOrTime).split(/[–-]/)[0].trim();
+// 月セル用：開始時刻 "HH:MM" を指す小さなアナログ時計アイコン。
+// 文字盤の色で時間帯を示す（午前 0:00–11:59 = オレンジ / 午後・夜 12:00–23:59 = 青）。針のみ。
+function clockGlyph(hhmm) {
+  const mt = /^(\d{1,2}):(\d{2})$/.exec(String(hhmm || '').trim());
+  if (!mt) return '';
+  const h = +mt[1], mn = +mt[2];
+  const cls = h < 12 ? 'is-am' : 'is-pm';
+  const minAng = mn * 6;                 // 分針: 360/60
+  const hrAng  = (h % 12) * 30 + mn * 0.5; // 時針: 360/12 + 分の寄与
+  const pt = (a, l) => {
+    const r = (a - 90) * Math.PI / 180;
+    return [(8 + l * Math.cos(r)).toFixed(1), (8 + l * Math.sin(r)).toFixed(1)];
+  };
+  const [hx, hy] = pt(hrAng, 3.1);
+  const [mx, my] = pt(minAng, 4.8);
+  return `<svg class="event-pill-clock ${cls}" viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">`
+    + `<circle class="epc-face" cx="8" cy="8" r="7" stroke="rgba(0,0,0,0.3)" stroke-width="0.5"/>`
+    + `<line x1="8" y1="8" x2="${hx}" y2="${hy}" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/>`
+    + `<line x1="8" y1="8" x2="${mx}" y2="${my}" stroke="#fff" stroke-width="1" stroke-linecap="round"/>`
+    + `<circle cx="8" cy="8" r="0.9" fill="#fff"/></svg>`;
 }
 
 function catCounts() {
@@ -1421,17 +1437,25 @@ function buildCell(y,m,d,isOther,isToday) {
       pill.className='event-pill'+(isShift(ev.catId)?' is-shift':'');
       pill.style.background=cat.color;
       if (isShift(ev.catId)&&ev.shiftStart) {
-        const t = isNarrowScreen() ? shortStartTime(ev.shiftStart) : `${ev.shiftStart}–${ev.shiftEnd}`;
-        pill.innerHTML=`<span class="event-pill-time">${t}</span>
-                        <span class="event-pill-name">${escHtml(cat.name)}</span>`;
+        if (isNarrowScreen()) {
+          // 月表示は開始時刻を小さなアナログ時計で表す（午前=オレンジ/午後・夜=青の文字盤）。
+          const g = clockGlyph(ev.shiftStart) || '<span class="event-pill-dot"></span>';
+          pill.innerHTML=`${g}<span class="event-pill-name">${escHtml(cat.name)}</span>`;
+        } else {
+          pill.innerHTML=`<span class="event-pill-time">${ev.shiftStart}–${ev.shiftEnd}</span><span class="event-pill-name">${escHtml(cat.name)}</span>`;
+        }
       } else {
-        const pillTime = ev.time
-          ? (ev.timeEnd ? `${ev.time}–${ev.timeEnd}` : ev.time)
-          : '';
-        const t = isNarrowScreen() ? shortStartTime(pillTime) : pillTime;
-        pill.innerHTML=t
-          ?`<span class="event-pill-time">${t}</span><span class="event-pill-name">${escHtml(ev.title)}</span>`
-          :`<span class="event-pill-dot"></span><span class="event-pill-name">${escHtml(ev.title)}</span>`;
+        if (isNarrowScreen()) {
+          const g = (ev.time ? clockGlyph(ev.time) : '') || '<span class="event-pill-dot"></span>';
+          pill.innerHTML=`${g}<span class="event-pill-name">${escHtml(ev.title)}</span>`;
+        } else {
+          const pillTime = ev.time
+            ? (ev.timeEnd ? `${ev.time}–${ev.timeEnd}` : ev.time)
+            : '';
+          pill.innerHTML=pillTime
+            ?`<span class="event-pill-time">${pillTime}</span><span class="event-pill-name">${escHtml(ev.title)}</span>`
+            :`<span class="event-pill-dot"></span><span class="event-pill-name">${escHtml(ev.title)}</span>`;
+        }
       }
       pill.addEventListener('click',e=>{e.stopPropagation();openDayModal(y,m,d);});
       if (ev._dbId) {

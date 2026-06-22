@@ -1263,6 +1263,11 @@ input  { font-family: inherit; }
 .event-pill-dot  { width: 5px; height: 5px; border-radius: 50%; background-color: rgba(255,255,255,0.6); flex-shrink: 0; }
 .event-pill-name { overflow: hidden; text-overflow: ellipsis; }
 
+/* 月セルの開始時刻アイコン（アナログ時計）。文字盤色で時間帯を示す。 */
+.event-pill-clock { flex-shrink: 0; display: block; }
+.event-pill-clock.is-am .epc-face { fill: var(--color-accent-orange); }  /* 午前 = オレンジ */
+.event-pill-clock.is-pm .epc-face { fill: var(--color-accent); }         /* 午後・夜 = 青 */
+
 /* shift pill: slightly different left border to distinguish */
 .event-pill.is-shift { border-left: 3px solid rgba(255,255,255,0.4); }
 

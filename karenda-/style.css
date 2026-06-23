@@ -1071,28 +1071,6 @@ input  { font-family: inherit; }
 .calendar-wrap { overflow: hidden; flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .calendar      { min-width: 560px; width: 100%; flex: 1; display: flex; flex-direction: column; min-height: 0; }
 
-/* 月ビュー右の「1日のスケジュール」常時表示バー */
-#js-month-view { flex-direction: row; }
-.day-bar {
-  width: 112px; flex-shrink: 0;
-  display: flex; flex-direction: column;
-  min-height: 0; overflow: hidden;
-  border-left: 1px solid var(--color-wire);
-  background: var(--color-bg-sidebar);
-}
-.day-bar-head {
-  flex-shrink: 0; padding: 4px 6px;
-  font-size: 11px; font-weight: 600;
-  color: var(--color-text-primary);
-  border-bottom: 1px solid var(--color-wire);
-}
-.day-bar-list { flex: 1; min-height: 0; overflow-y: auto; padding: 4px; display: flex; flex-direction: column; gap: 3px; }
-.day-bar-ev { display: flex; align-items: center; gap: 4px; font-size: 10px; line-height: 1.25; }
-.day-bar-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
-.day-bar-time { font-variant-numeric: tabular-nums; color: var(--color-text-secondary); flex-shrink: 0; }
-.day-bar-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-text-primary); }
-.day-bar-empty { font-size: 10px; color: var(--color-text-disabled); padding: 6px; }
-
 .weekdays-row {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));

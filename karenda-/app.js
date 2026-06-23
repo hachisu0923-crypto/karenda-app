@@ -1533,6 +1533,7 @@ function buildCell(y,m,d,isOther,isToday) {
 
 function openDayModal(y,m,d) {
   selectedKey=dateKey(y,m,d);
+  renderDayBar();   // 右のスケジュールバーをタップした日に更新
   const dow=new Date(y,m,d).getDay();
   document.getElementById('js-day-modal-title').textContent=`${MONTHS_INIT[m]} ${d}, ${y}`;
   document.getElementById('js-day-modal-sub').textContent=DAYS_EN[dow];
@@ -2889,8 +2890,39 @@ function updateStatusBar() {
 
 // ── Render all ────────────────────────────────────────────────────────────────
 
+// 月ビュー右の「1日のスケジュール」バー。選択日（タップした日）またはデフォルトで今日を表示。
+function renderDayBar(){
+  const bar=document.getElementById('js-day-bar');
+  if(!bar) return;
+  const t=new Date();
+  const todayK=dateKey(t.getFullYear(), t.getMonth(), t.getDate());
+  const key=selectedKey||todayK;
+  const [yy,mm,dd]=key.split('-').map(Number);
+  const WK=['日','月','火','水','木','金','土'];
+  const wd=new Date(yy,mm-1,dd).getDay();
+  const evs=sortEvs(events[key]||[]);
+  let rows;
+  if(!evs.length){
+    rows='<div class="day-bar-empty">予定なし</div>';
+  } else {
+    rows=evs.map(ev=>{
+      const cat=getCat(ev.catId)||{color:'#888',name:''};
+      const isSh=isShift(ev.catId);
+      const t2=isSh?(ev.shiftStart||''):(ev.time||'');
+      const timeStr=t2||'終日';
+      const title=isSh?cat.name:(ev.title||'');
+      return `<div class="day-bar-ev"><span class="day-bar-dot" style="background:${cat.color}"></span>`
+        +`<span class="day-bar-time">${escHtml(timeStr)}</span>`
+        +`<span class="day-bar-title">${escHtml(title)}</span></div>`;
+    }).join('');
+  }
+  bar.innerHTML=`<div class="day-bar-head">${mm}/${dd} (${WK[wd]})</div>`
+    +`<div class="day-bar-list">${rows}</div>`;
+}
+
 function renderAll(){
   renderMain();
+  renderDayBar();
   renderMini();
   renderSidebar();
   if (currentView === 'day')  renderDayView();

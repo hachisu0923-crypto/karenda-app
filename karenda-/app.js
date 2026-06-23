@@ -3329,6 +3329,33 @@ document.getElementById('js-mbb-more')?.addEventListener('click', () => {
 
   resetToSetup();   // 初期表示（10:00）
 })();
+
+// ── サイドバー BGM（YouTube 埋め込み）─────────────────────────────────────
+(function initBgm(){
+  const btn = document.getElementById('js-bgm-toggle');
+  const holder = document.getElementById('js-bgm-player');
+  if (!btn || !holder) return;
+  const VID = 'PB8ZrGinWi0';
+  let playing = false;
+  btn.addEventListener('click', ()=>{
+    if (!playing){
+      // クリック（ユーザー操作）を起点に iframe を生成して自動再生・ループ
+      holder.hidden = false;
+      holder.innerHTML =
+        '<iframe src="https://www.youtube.com/embed/'+VID+'?autoplay=1&loop=1&playlist='+VID+'" '
+        + 'title="BGM" frameborder="0" '
+        + 'allow="autoplay; encrypted-media" allowfullscreen></iframe>';
+      btn.textContent = '⏸ BGMを停止';
+      playing = true;
+    } else {
+      // iframe を破棄して停止
+      holder.innerHTML = '';
+      holder.hidden = true;
+      btn.textContent = '🎵 BGMを再生';
+      playing = false;
+    }
+  });
+})();
 document.getElementById('js-fab-add')?.addEventListener('click', () => {
   // 月/週ビューでは今日を、日ビューでは表示中の日を対象に
   const target = (currentView === 'day' && dvDate) ? dvDate : new Date();

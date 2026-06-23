@@ -1394,7 +1394,18 @@ function buildCell(y,m,d,isOther,isToday) {
 
   const numEl=document.createElement('div');
   numEl.className='day-num'; numEl.textContent=d;
-  cell.appendChild(numEl);
+  const head=document.createElement('div');
+  head.className='day-head';
+  head.appendChild(numEl);
+  // 日付番号の右に、その日の予定の開始時刻を時計アイコンで時間順に並べる（dayEvs は sortEvs 済み）
+  const timedEvs=dayEvs.filter(ev=>isShift(ev.catId)?ev.shiftStart:ev.time);
+  if (timedEvs.length) {
+    const clocks=document.createElement('div');
+    clocks.className='day-clocks';
+    clocks.innerHTML=timedEvs.map(ev=>clockGlyph(isShift(ev.catId)?ev.shiftStart:ev.time)).join('');
+    head.appendChild(clocks);
+  }
+  cell.appendChild(head);
 
   // 飲酒カウンター（セル右上に絶対配置、0も含めて常に表示、0は薄色、3超で警告色）
   const drinkCount = dailyDrinks[key] ?? 0;
@@ -1438,16 +1449,14 @@ function buildCell(y,m,d,isOther,isToday) {
       pill.style.background=cat.color;
       if (isShift(ev.catId)&&ev.shiftStart) {
         if (isNarrowScreen()) {
-          // 月表示は開始時刻を小さなアナログ時計で表す（午前=オレンジ/午後・夜=青の文字盤）。
-          const g = clockGlyph(ev.shiftStart) || '<span class="event-pill-dot"></span>';
-          pill.innerHTML=`${g}<span class="event-pill-name">${escHtml(cat.name)}</span>`;
+          // 時刻は日付番号の右の時計に集約したので、ピルはタイトル（カテゴリ名）のみ。
+          pill.innerHTML=`<span class="event-pill-name">${escHtml(cat.name)}</span>`;
         } else {
           pill.innerHTML=`<span class="event-pill-time">${ev.shiftStart}–${ev.shiftEnd}</span><span class="event-pill-name">${escHtml(cat.name)}</span>`;
         }
       } else {
         if (isNarrowScreen()) {
-          const g = (ev.time ? clockGlyph(ev.time) : '') || '<span class="event-pill-dot"></span>';
-          pill.innerHTML=`${g}<span class="event-pill-name">${escHtml(ev.title)}</span>`;
+          pill.innerHTML=`<span class="event-pill-name">${escHtml(ev.title)}</span>`;
         } else {
           const pillTime = ev.time
             ? (ev.timeEnd ? `${ev.time}–${ev.timeEnd}` : ev.time)

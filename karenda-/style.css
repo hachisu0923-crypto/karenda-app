@@ -1268,6 +1268,36 @@ input  { font-family: inherit; }
 .event-pill-dot  { width: 5px; height: 5px; border-radius: 50%; background-color: rgba(255,255,255,0.6); flex-shrink: 0; }
 .event-pill-name { overflow: hidden; text-overflow: ellipsis; }
 
+/* ── タイマー（カウントダウン / ポモドーロ）モーダル ── */
+.timer-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+.timer-tab {
+  flex: 1; padding: 7px 8px; font-size: 12px; font-weight: 600;
+  border: 1px solid var(--color-wire); border-radius: var(--radius-md);
+  background: var(--color-bg-input); color: var(--color-text-secondary); cursor: pointer;
+}
+.timer-tab.is-active { background: var(--color-accent); color: #fff; border-color: var(--color-accent); }
+.timer-setup { margin-bottom: 10px; }
+.timer-cd-inputs { display: flex; align-items: center; gap: 4px; justify-content: center; font-size: 13px; color: var(--color-text-secondary); }
+.timer-cd-inputs input {
+  width: 52px; padding: 5px 6px; font-size: 14px; text-align: center;
+  border: 1px solid var(--color-wire); border-radius: var(--radius-sm);
+  background: var(--color-bg-input); color: var(--color-text-primary);
+}
+.timer-presets { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; margin-top: 8px; }
+.timer-presets button {
+  padding: 4px 9px; font-size: 11px; cursor: pointer;
+  border: 1px solid var(--color-wire); border-radius: 999px;
+  background: var(--color-bg-input); color: var(--color-text-secondary);
+}
+.timer-presets button:hover { background: var(--color-bg-hover); }
+.timer-phase { text-align: center; font-size: 12px; font-weight: 600; color: var(--color-accent); min-height: 16px; }
+.timer-display {
+  text-align: center; font-family: 'JetBrains Mono', monospace;
+  font-size: 46px; font-weight: 600; letter-spacing: 1px;
+  color: var(--color-text-primary); margin: 4px 0 14px; font-variant-numeric: tabular-nums;
+}
+.timer-controls { display: flex; align-items: center; justify-content: center; gap: 12px; }
+
 /* 月セルの開始時刻アイコン（アナログ時計）。文字盤色で時間帯を示す。 */
 .event-pill-clock { flex-shrink: 0; display: block; }
 .event-pill-clock.is-am .epc-face { fill: var(--color-accent-orange); }  /* 午前 = オレンジ */

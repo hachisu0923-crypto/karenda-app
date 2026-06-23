@@ -3175,6 +3175,160 @@ document.querySelectorAll('.mbb-btn[data-view]').forEach(btn => {
 document.getElementById('js-mbb-more')?.addEventListener('click', () => {
   document.getElementById('js-sidebar-toggle')?.click();
 });
+
+// ── タイマー（カウントダウン / ポモドーロ）─────────────────────────────────
+(function initTimer(){
+  const overlay = document.getElementById('js-timer-overlay');
+  if (!overlay) return;
+  const $ = id => document.getElementById(id);
+  const dispEl = $('js-timer-display');
+  const phaseEl = $('js-timer-phase');
+  const startBtn = $('js-timer-startpause');
+  const cdSetup = $('js-timer-cd-setup');
+  const pomoSetup = $('js-timer-pomo-setup');
+
+  let mode = 'countdown';        // 'countdown' | 'pomodoro'
+  let running = false;
+  let remaining = 600;           // 残り秒
+  let endAt = 0;                 // 終了予定時刻(ms)。ドリフトしないよう実時刻基準。
+  let ticker = null;
+  let pomoPhase = 'work';        // 'work' | 'break'
+  let pomoCount = 0;             // 完了した作業セッション数
+  let audioCtx = null;
+
+  function fmt(sec){
+    sec = Math.max(0, Math.round(sec));
+    const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = sec%60;
+    const mm = String(m).padStart(2,'0'), ss = String(s).padStart(2,'0');
+    return h>0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+  }
+  function cdSeconds(){
+    const m = Math.max(0, parseInt($('js-timer-cd-min').value,10)||0);
+    const s = Math.min(59, Math.max(0, parseInt($('js-timer-cd-sec').value,10)||0));
+    return m*60+s;
+  }
+  function pomoWorkSec(){ return Math.max(1, parseInt($('js-timer-pomo-work').value,10)||25)*60; }
+  function pomoBreakSec(){ return Math.max(1, parseInt($('js-timer-pomo-break').value,10)||5)*60; }
+
+  function render(){
+    dispEl.textContent = fmt(remaining);
+    startBtn.textContent = running ? '一時停止' : '開始';
+    if (mode === 'pomodoro') {
+      phaseEl.textContent = (pomoPhase === 'work' ? '作業中' : '休憩中') + (pomoCount ? `（${pomoCount}）` : '');
+    } else {
+      phaseEl.textContent = '';
+    }
+  }
+  function ensureAudio(){
+    try { if (!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)(); } catch(e){}
+  }
+  function beep(){
+    if (!audioCtx) return;
+    try {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      let t = audioCtx.currentTime;
+      for (let i=0;i<3;i++){
+        const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.type='sine'; o.frequency.value = 880;
+        o.connect(g); g.connect(audioCtx.destination);
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.3, t+0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t+0.4);
+        o.start(t); o.stop(t+0.42);
+        t += 0.55;
+      }
+    } catch(e){}
+  }
+  function notify(title, body){
+    try { if (typeof _showNotif === 'function') _showNotif(title, body, 'karenda-timer'); } catch(e){}
+  }
+
+  function stopTicker(){ if (ticker){ clearInterval(ticker); ticker=null; } }
+  function tick(){
+    remaining = Math.max(0, (endAt - Date.now())/1000);
+    if (remaining <= 0) { onFinish(); return; }
+    render();
+  }
+  function startCountingTo(sec){
+    remaining = sec;
+    endAt = Date.now() + sec*1000;
+    running = true;
+    stopTicker();
+    ticker = setInterval(tick, 250);
+    render();
+  }
+
+  function onFinish(){
+    stopTicker();
+    running = false;
+    remaining = 0;
+    beep();
+    if (mode === 'countdown') {
+      notify('⏰ タイマー終了', '設定した時間になりました');
+      render();
+    } else {
+      // ポモドーロ：作業↔休憩を自動で切替えて継続
+      if (pomoPhase === 'work') {
+        pomoCount += 1;
+        notify('⏰ 作業終了', `休憩 ${Math.round(pomoBreakSec()/60)} 分です`);
+        pomoPhase = 'break';
+        startCountingTo(pomoBreakSec());
+      } else {
+        notify('⏰ 休憩終了', `作業 ${Math.round(pomoWorkSec()/60)} 分を始めましょう`);
+        pomoPhase = 'work';
+        startCountingTo(pomoWorkSec());
+      }
+    }
+  }
+
+  function resetToSetup(){
+    stopTicker();
+    running = false;
+    if (mode === 'countdown') { remaining = cdSeconds(); }
+    else { pomoPhase='work'; pomoCount=0; remaining = pomoWorkSec(); }
+    render();
+  }
+
+  function setMode(m){
+    mode = m;
+    document.querySelectorAll('.timer-tab').forEach(t=>t.classList.toggle('is-active', t.dataset.mode===m));
+    cdSetup.style.display = m==='countdown' ? '' : 'none';
+    pomoSetup.style.display = m==='pomodoro' ? '' : 'none';
+    resetToSetup();
+  }
+
+  // 操作
+  startBtn.addEventListener('click', ()=>{
+    ensureAudio();
+    if (typeof requestNotificationPermission === 'function') requestNotificationPermission();
+    if (running) { stopTicker(); running=false; render(); return; }   // 一時停止
+    if (remaining <= 0) resetToSetup();
+    if (mode === 'countdown') { if (remaining<=0) remaining = cdSeconds(); }
+    if (remaining <= 0) return;   // 0 では開始しない
+    startCountingTo(remaining);
+  });
+  $('js-timer-reset').addEventListener('click', resetToSetup);
+  document.querySelectorAll('.timer-tab').forEach(t=> t.addEventListener('click', ()=> setMode(t.dataset.mode)));
+  document.querySelectorAll('#js-timer-cd-setup .timer-presets button').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      $('js-timer-cd-min').value = b.dataset.min;
+      $('js-timer-cd-sec').value = 0;
+      if (!running) resetToSetup();
+    });
+  });
+  // 設定値を変えたら（停止中のみ）表示へ反映
+  ['js-timer-cd-min','js-timer-cd-sec','js-timer-pomo-work','js-timer-pomo-break'].forEach(id=>{
+    $(id)?.addEventListener('input', ()=>{ if (!running) resetToSetup(); });
+  });
+
+  function openTimer(){ resetToSetup_ifNeeded(); openOverlay('js-timer-overlay'); render(); }
+  function resetToSetup_ifNeeded(){ if (!running && remaining<=0) resetToSetup(); }
+  $('js-mbb-timer')?.addEventListener('click', openTimer);
+  $('js-timer-close')?.addEventListener('click', ()=> closeOverlay('js-timer-overlay'));  // 閉じてもタイマーは継続
+  overlay.addEventListener('click', e=>{ if (e.target===overlay) closeOverlay('js-timer-overlay'); });
+
+  resetToSetup();   // 初期表示（10:00）
+})();
 document.getElementById('js-fab-add')?.addEventListener('click', () => {
   // 月/週ビューでは今日を、日ビューでは表示中の日を対象に
   const target = (currentView === 'day' && dvDate) ? dvDate : new Date();

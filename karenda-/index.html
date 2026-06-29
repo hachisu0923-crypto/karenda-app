@@ -1030,6 +1030,22 @@
   </div>
 </div>
 
+<!-- ═══════════ 汎用確認ダイアログ（ネイティブ confirm の代替）═══════════ -->
+<div class="overlay" id="js-confirm-overlay">
+  <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="js-confirm-msg">
+    <div class="modal-body">
+      <div class="confirm-msg" id="js-confirm-msg"></div>
+      <div class="confirm-actions">
+        <button class="btn-text" type="button" id="js-confirm-cancel">キャンセル</button>
+        <button class="btn-primary" type="button" id="js-confirm-ok">OK</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 非ブロッキング通知トースト（ネイティブ alert の代替）-->
+<div class="app-toast" id="js-app-toast" role="status" aria-live="polite"></div>
+
 <script src="app.js"></script>
 <script>
   // Service Worker 登録

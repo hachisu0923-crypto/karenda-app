@@ -2738,8 +2738,12 @@ document.getElementById('js-day-overlay').addEventListener('click',e=>{
 
 // ── Navigation ────────────────────────────────────────────────────────────────
 
-document.getElementById('js-prev-month').addEventListener('click',()=>{curDate.setMonth(curDate.getMonth()-1);renderAll();});
-document.getElementById('js-next-month').addEventListener('click',()=>{curDate.setMonth(curDate.getMonth()+1);renderAll();});
+// Shift the visible month, clamping to day 1 so month-end days never overflow
+// into the wrong month (logic in lib/date-utils.js, tested in tests/).
+function shiftMonth(delta){ curDate = shiftMonthDate(curDate, delta); }
+
+document.getElementById('js-prev-month').addEventListener('click',()=>{shiftMonth(-1);renderAll();});
+document.getElementById('js-next-month').addEventListener('click',()=>{shiftMonth(1);renderAll();});
 
 // ── Swipe navigation (month view) ──────────────────────────────────────────────
 (function() {
@@ -2762,9 +2766,9 @@ document.getElementById('js-next-month').addEventListener('click',()=>{curDate.s
       tracking = false;
       e.preventDefault();
       if (dx < 0) {
-        curDate.setMonth(curDate.getMonth() + 1);
+        shiftMonth(1);
       } else {
-        curDate.setMonth(curDate.getMonth() - 1);
+        shiftMonth(-1);
       }
       renderAll();
     }
@@ -2773,8 +2777,8 @@ document.getElementById('js-next-month').addEventListener('click',()=>{curDate.s
 })();
 
 document.getElementById('js-today').addEventListener('click',()=>{curDate=new Date();renderAll();});
-document.getElementById('js-mini-prev').addEventListener('click',()=>{curDate.setMonth(curDate.getMonth()-1);renderAll();});
-document.getElementById('js-mini-next').addEventListener('click',()=>{curDate.setMonth(curDate.getMonth()+1);renderAll();});
+document.getElementById('js-mini-prev').addEventListener('click',()=>{shiftMonth(-1);renderAll();});
+document.getElementById('js-mini-next').addEventListener('click',()=>{shiftMonth(1);renderAll();});
 document.getElementById('js-open-cat-editor').addEventListener('click',openCatEditor);
 document.getElementById('js-theme-toggle').addEventListener('click',toggleTheme);
 
@@ -2866,7 +2870,7 @@ document.getElementById('js-open-budget-cat-editor').addEventListener('click',op
 document.addEventListener('keydown',e=>{
   // Escapeキーはinput内でもモーダルを閉じられるようにする
   if (e.key==='Escape'){
-    closeOverlay('js-day-overlay');closeOverlay('js-cat-overlay');closeOverlay('js-budget-cat-overlay');closeEditModal();closeColorPopup();closeOverlay('js-receipt-overlay');closeOverlay('js-apikey-overlay');closeOverlay('js-overtime-cashout-overlay');closeOverlay('js-overtime-history-overlay');closeRepeatPicker();closeOverlay('js-ios-guide-overlay');closeOverlay('js-jcb-overlay');
+    closeOverlay('js-day-overlay');closeOverlay('js-cat-overlay');closeOverlay('js-budget-cat-overlay');closeEditModal();closeColorPopup();closeOverlay('js-receipt-overlay');closeOverlay('js-overtime-cashout-overlay');closeOverlay('js-overtime-history-overlay');closeRepeatPicker();closeOverlay('js-ios-guide-overlay');closeOverlay('js-jcb-overlay');
     if (document.activeElement) document.activeElement.blur();
     return;
   }
@@ -2892,8 +2896,8 @@ document.addEventListener('keydown',e=>{
     return;
   }
   if (['INPUT','TEXTAREA'].includes(e.target.tagName)) return;
-  if (e.key==='ArrowLeft'){curDate.setMonth(curDate.getMonth()-1);renderAll();}
-  if (e.key==='ArrowRight'){curDate.setMonth(curDate.getMonth()+1);renderAll();}
+  if (e.key==='ArrowLeft'){shiftMonth(-1);renderAll();}
+  if (e.key==='ArrowRight'){shiftMonth(1);renderAll();}
   if (e.key.toLowerCase()==='t'){curDate=new Date();renderAll();}
 });
 
@@ -2932,6 +2936,12 @@ function updateStatusBar() {
 
 // ── Render all ────────────────────────────────────────────────────────────────
 
+// True when the bottom "家計簿/Budget" tab is the active panel.
+function isBudgetPanelVisible(){
+  var t = document.querySelector('.bp-tab.is-active');
+  return !!t && t.dataset.bp === 'budget';
+}
+
 function renderAll(){
   renderMain();
   renderMini();
@@ -2944,8 +2954,9 @@ function renderAll(){
   if (typeof _taskState !== 'undefined' && _taskState) {
     renderTaskPanel();
   }
-  // Keep Budget panel in sync (async — fires Supabase load if month changed)
-  if (typeof _budgetState !== 'undefined' && _budgetState) {
+  // Keep Budget panel in sync — only when it's the visible tab, so routine
+  // calendar navigation doesn't fire the (12-month) budget Supabase query.
+  if (typeof _budgetState !== 'undefined' && _budgetState && isBudgetPanelVisible()) {
     _syncBudgetMonth().then(function() { renderBudgetPanel(); });
   }
 }
@@ -3937,7 +3948,7 @@ function initBottomPanelTabs() {
       document.getElementById('js-bp-task').style.display   = target === 'task'   ? '' : 'none';
       document.getElementById('js-bp-budget').style.display = target === 'budget' ? '' : 'none';
       document.getElementById('js-bp-goal').style.display   = target === 'goal'   ? '' : 'none';
-      if (target === 'budget') renderBudgetPanel();
+      if (target === 'budget') _syncBudgetMonth().then(renderBudgetPanel);
     });
   });
 }
@@ -4795,7 +4806,7 @@ async function addBudgetToSupabase(entry) {
   try {
     const { data, error } = await db.from('budget_entries').insert({
       user_id:   currentUser.id,
-      month_key: _budgetMonthKey(),
+      month_key: monthKeyFromDate(entry.date) || _budgetMonthKey(),
       entry_id:  entry.id,
       type:      entry.type,
       cat_id:    entry.catId,
@@ -4818,11 +4829,12 @@ async function updateBudgetToSupabase(entry) {
   try {
     const { error } = await db.from('budget_entries')
       .update({
-        type:   entry.type,
-        cat_id: entry.catId,
-        amount: entry.amount,
-        memo:   entry.memo || '',
-        date:   entry.date
+        type:      entry.type,
+        cat_id:    entry.catId,
+        amount:    entry.amount,
+        memo:      entry.memo || '',
+        date:      entry.date,
+        month_key: monthKeyFromDate(entry.date) || _budgetMonthKey()
       })
       .eq('user_id', currentUser.id)
       .eq('entry_id', entry.id);
@@ -5380,61 +5392,25 @@ function renderBudgetPanel() {
 //  RECEIPT SCANNING (レシート読取)
 // ════════════════════════════════════════════════════════════
 
-const RECEIPT_APIKEY_STORAGE = 'kuro_claude_key';
 let _receiptBase64 = null;
 let _receiptMediaType = null;
 let _receiptParsed = null;
 
-// ── API Key management ──
-
-function getReceiptApiKey() {
-  return localStorage.getItem(RECEIPT_APIKEY_STORAGE) || '';
-}
-function setReceiptApiKey(key) {
-  localStorage.setItem(RECEIPT_APIKEY_STORAGE, key);
-}
-
-// ── API Key modal ──
-
-document.getElementById('js-receipt-key-btn').addEventListener('click', function() {
-  document.getElementById('js-apikey-input').value = getReceiptApiKey();
-  openOverlay('js-apikey-overlay');
-});
-
-document.getElementById('js-apikey-save').addEventListener('click', function() {
-  var key = document.getElementById('js-apikey-input').value.trim();
-  setReceiptApiKey(key);
-  closeOverlay('js-apikey-overlay');
-});
-
-document.getElementById('js-apikey-cancel').addEventListener('click', function() {
-  closeOverlay('js-apikey-overlay');
-});
-document.getElementById('js-apikey-modal-close').addEventListener('click', function() {
-  closeOverlay('js-apikey-overlay');
-});
-document.getElementById('js-apikey-overlay').addEventListener('click', function(e) {
-  if (e.target === document.getElementById('js-apikey-overlay')) closeOverlay('js-apikey-overlay');
-});
+// ── Anthropic API key handling REMOVED for security ──
+// Older versions stored a user-supplied Anthropic API key in localStorage and
+// called the Anthropic API directly from the browser
+// ('anthropic-dangerous-direct-browser-access'), which exposed the key to any XSS.
+// The key, its ⚙ settings modal, and the direct call have been removed; the
+// on-device receipt scanner is disabled until reimplemented via a server proxy.
+// Purge any key persisted by older versions:
+try { localStorage.removeItem('kuro_claude_key'); } catch (e) {}
 
 // ── Receipt modal ──
 
 function openReceiptModal() {
-  var apiKey = getReceiptApiKey();
-  if (!apiKey) {
-    // Prompt for API key first
-    document.getElementById('js-apikey-input').value = '';
-    openOverlay('js-apikey-overlay');
-    return;
-  }
-  _receiptBase64 = null;
-  _receiptMediaType = null;
-  _receiptParsed = null;
-  _showReceiptStep('upload');
-  document.getElementById('js-receipt-preview').style.display = 'none';
-  document.getElementById('js-receipt-analyze').style.display = 'none';
-  document.getElementById('js-receipt-drop').style.display = '';
-  openOverlay('js-receipt-overlay');
+  // Disabled: receipt AI scanning required a client-side Anthropic API key,
+  // which was removed for security. Reimplement behind a server proxy to restore.
+  appNotice('レシートのAI解析は無効化されています（APIキーのクライアント保存を廃止しました）。');
 }
 
 function _showReceiptStep(step) {
@@ -5526,9 +5502,12 @@ document.getElementById('js-receipt-clear').addEventListener('click', function()
 // ── Analyze receipt (Claude Haiku API) ──
 
 document.getElementById('js-receipt-analyze').addEventListener('click', async function() {
+  // Disabled for security: the client-side Anthropic API key was removed, so no
+  // receipt image is sent anywhere. The legacy code below is unreachable.
+  appNotice('レシートのAI解析は無効化されています（APIキーのクライアント保存を廃止しました）。');
+  return;
+  // --- legacy (unreachable) ---
   if (!_receiptBase64) return;
-  var apiKey = getReceiptApiKey();
-  if (!apiKey) { openReceiptModal(); return; }
 
   _showReceiptStep('loading');
 
@@ -5536,13 +5515,10 @@ document.getElementById('js-receipt-analyze').addEventListener('click', async fu
   var catList = budgetExpenseCats.map(function(c) { return '- ' + c.id + ': ' + c.name; }).join('\n');
 
   try {
-    var response = await fetch('https://api.anthropic.com/v1/messages', {
+    var response = await fetch('about:blank', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',

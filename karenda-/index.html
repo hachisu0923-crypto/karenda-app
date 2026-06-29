@@ -2,6 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.cdnfonts.com; font-src 'self' data: https://fonts.gstatic.com https://fonts.cdnfonts.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; frame-src https://www.youtube.com; media-src 'self' data: blob:; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>My Calendar</title>
   <link rel="manifest" href="manifest.json" />
@@ -11,8 +12,8 @@
   <meta name="apple-mobile-web-app-title" content="My Calendar" />
   <meta name="theme-color" content="#4f8ef7" />
   <link rel="stylesheet" href="style.css" />
-  <!-- Supabase JS SDK -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Supabase JS SDK (pinned + Subresource Integrity) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.108.2" integrity="sha384-JWEyvHh+lRf0sN/WWY+QTQwX+CyWqmNg4tkc8GQzAMEtR2wGNrCJlvnu1lHD1kDm" crossorigin="anonymous"></script>
 </head>
 <body>
 
@@ -325,7 +326,6 @@
           <div class="budget-header-actions">
             <button class="btn-receipt" id="js-receipt-btn" title="レシートから読み取り">📷 レシート読取</button>
             <button class="btn-receipt-key" id="js-jcb-btn" title="JCBメール自動取込の設定">💳</button>
-            <button class="btn-receipt-key" id="js-receipt-key-btn" title="API Key設定">⚙</button>
             <button class="btn-receipt-key" id="js-open-budget-cat-editor" title="カテゴリを編集">🏷</button>
           </div>
         </div>
@@ -673,11 +673,11 @@
       </p>
       <div class="form-row">
         <label class="form-label">あなたのユーザーID（INGEST_USER_ID にコピー）</label>
-        <input class="form-input" id="js-jcb-userid" type="text" readonly onclick="this.select()" />
+        <input class="form-input" id="js-jcb-userid" type="text" readonly />
       </div>
       <div class="form-row">
         <label class="form-label">取込エンドポイント URL</label>
-        <input class="form-input" id="js-jcb-url" type="text" readonly onclick="this.select()"
+        <input class="form-input" id="js-jcb-url" type="text" readonly
                value="https://oungvayvmxkszsokxwxd.supabase.co/functions/v1/ingest-jcb" />
       </div>
       <p style="font-size:12px;line-height:1.7;margin:10px 0 0;opacity:.75;">
@@ -813,34 +813,8 @@
   </div>
 </div>
 
-<!-- ═══════════ API KEY MODAL ═══════════ -->
-<div class="overlay" id="js-apikey-overlay">
-  <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="js-apikey-modal-title">
-    <div class="modal-header">
-      <div>
-        <div class="modal-header-title" id="js-apikey-modal-title">⚙ Anthropic API Key 設定</div>
-        <div class="modal-header-sub">レシート解析にAnthropicのAPIキーが必要です</div>
-      </div>
-      <button class="modal-close-btn" id="js-apikey-modal-close" aria-label="閉じる">✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="form-row">
-        <label class="form-label" for="js-apikey-input">Anthropic API Key</label>
-        <input class="form-input" type="password" id="js-apikey-input" placeholder="sk-ant-..." autocomplete="off" />
-      </div>
-      <div class="apikey-hint">
-        APIキーは端末内のみに保存され、サーバーには送信されません。<br>
-        <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener" class="apikey-link">
-          Anthropic Consoleでキーを取得 →
-        </a>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn-secondary" id="js-apikey-cancel">キャンセル</button>
-      <button class="btn-primary" style="width:auto;padding:7px 18px;" id="js-apikey-save">保存する</button>
-    </div>
-  </div>
-</div>
+<!-- API KEY MODAL removed: the receipt scanner no longer stores an Anthropic API key client-side (security). -->
+
 
 <!-- ═══════════ OVERTIME CASHOUT MODAL ═══════════ -->
 <div class="overlay" id="js-overtime-cashout-overlay">
@@ -1046,14 +1020,8 @@
 <!-- 非ブロッキング通知トースト（ネイティブ alert の代替）-->
 <div class="app-toast" id="js-app-toast" role="status" aria-live="polite"></div>
 
+<script src="lib/date-utils.js"></script>
 <script src="app.js"></script>
-<script>
-  // Service Worker 登録
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').catch(err =>
-      console.warn('SW registration failed:', err)
-    );
-  }
-</script>
+<script src="app-init.js"></script>
 </body>
 </html>

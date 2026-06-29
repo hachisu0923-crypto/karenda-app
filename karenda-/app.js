@@ -1705,7 +1705,7 @@ function renderExistingEvents() {
     delBtn.addEventListener('click', async e => {
       e.stopPropagation();
       e.preventDefault();
-      if (!confirm('この予定を削除しますか？')) return;
+      if (!(await appConfirm('この予定を削除しますか？', '削除'))) return;
       const arr = events[selectedKey];
       const idx = arr.indexOf(ev);
       if (idx !== -1) {
@@ -2403,7 +2403,7 @@ function renderOvertimeHistoryContent() {
         <span class="row-pay">${fmtYen(pay)}</span>
         <button class="row-undo" type="button">取消</button>`;
       row.querySelector('.row-undo').addEventListener('click', async () => {
-        if (!confirm(`この振替（${formatMinToHHMM(c.minutes)} / ${fmtYen(pay)}）を取消してバンクに戻しますか？`)) return;
+        if (!(await appConfirm(`この振替（${formatMinToHHMM(c.minutes)} / ${fmtYen(pay)}）を取消してバンクに戻しますか？`, '取消'))) return;
         await deleteOvertimeCashoutFromSupabase(c);
         const idx = overtimeCashouts.indexOf(c);
         if (idx !== -1) overtimeCashouts.splice(idx, 1);
@@ -2681,6 +2681,49 @@ function closeOverlay(id){
     try { prev.focus(); } catch (_) { /* element may be detached */ }
   }
 }
+
+// ── アプリ内ダイアログ（ネイティブ confirm/alert の代替）────────────────────
+// 透過 + frameless の Electron ウィンドウではネイティブ confirm()/alert() を出すと
+// ダイアログ後に入力を受け付けなくなる（要再起動）ことがあるため、HTML モーダルで代替する。
+function appConfirm(message, okLabel){
+  return new Promise(resolve=>{
+    const ov = document.getElementById('js-confirm-overlay');
+    const msg = document.getElementById('js-confirm-msg');
+    const ok = document.getElementById('js-confirm-ok');
+    const cancel = document.getElementById('js-confirm-cancel');
+    if (!ov || !msg || !ok || !cancel){ resolve(true); return; }   // 要素が無ければ既定で許可
+    msg.textContent = message;
+    ok.textContent = okLabel || 'OK';
+    function cleanup(v){
+      ok.removeEventListener('click', onOk);
+      cancel.removeEventListener('click', onCancel);
+      ov.removeEventListener('click', onBackdrop);
+      closeOverlay('js-confirm-overlay');
+      resolve(v);
+    }
+    const onOk = ()=>cleanup(true);
+    const onCancel = ()=>cleanup(false);
+    const onBackdrop = (e)=>{ if (e.target === ov) cleanup(false); };
+    ok.addEventListener('click', onOk);
+    cancel.addEventListener('click', onCancel);
+    ov.addEventListener('click', onBackdrop);
+    openOverlay('js-confirm-overlay');
+    setTimeout(()=>{ try { ok.focus(); } catch(_){} }, 50);
+  });
+}
+
+let _appToastTimer = null;
+function appNotice(message){
+  const t = document.getElementById('js-app-toast');
+  if (!t){ return; }
+  t.textContent = String(message);
+  t.classList.add('is-show');
+  clearTimeout(_appToastTimer);
+  _appToastTimer = setTimeout(()=>t.classList.remove('is-show'), 4500);
+}
+
+// ネイティブ alert を非ブロッキングのトーストに置き換え（同じ凍結対策）。
+window.alert = function(message){ appNotice(message); };
 
 document.getElementById('js-day-modal-close').addEventListener('click',()=>{
   closeOverlay('js-edit-overlay');

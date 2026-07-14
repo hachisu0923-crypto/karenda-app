@@ -1397,14 +1397,7 @@ function buildCell(y,m,d,isOther,isToday) {
   const head=document.createElement('div');
   head.className='day-head';
   head.appendChild(numEl);
-  // 日付番号の右に、その日の予定の開始時刻を時計アイコンで時間順に並べる（dayEvs は sortEvs 済み）
-  const timedEvs=dayEvs.filter(ev=>isShift(ev.catId)?ev.shiftStart:ev.time);
-  if (timedEvs.length) {
-    const clocks=document.createElement('div');
-    clocks.className='day-clocks';
-    clocks.innerHTML=timedEvs.map(ev=>clockGlyph(isShift(ev.catId)?ev.shiftStart:ev.time)).join('');
-    head.appendChild(clocks);
-  }
+  // 予定時刻は各予定ピルの1段目に表示するため、日付番号の右の時計アイコンは廃止。
   cell.appendChild(head);
 
   // 飲酒カウンター（セル右上に絶対配置、0も含めて常に表示、0は薄色、3超で警告色）
@@ -1449,14 +1442,17 @@ function buildCell(y,m,d,isOther,isToday) {
       pill.style.background=cat.color;
       if (isShift(ev.catId)&&ev.shiftStart) {
         if (isNarrowScreen()) {
-          // 時刻は日付番号の右の時計に集約したので、ピルはタイトル（カテゴリ名）のみ。
-          pill.innerHTML=`<span class="event-pill-name">${escHtml(cat.name)}</span>`;
+          // 2段表示：1段目に開始時刻、2段目にカテゴリ名
+          pill.innerHTML=`<span class="event-pill-time">${ev.shiftStart}</span><span class="event-pill-name">${escHtml(cat.name)}</span>`;
         } else {
           pill.innerHTML=`<span class="event-pill-time">${ev.shiftStart}–${ev.shiftEnd}</span><span class="event-pill-name">${escHtml(cat.name)}</span>`;
         }
       } else {
         if (isNarrowScreen()) {
-          pill.innerHTML=`<span class="event-pill-name">${escHtml(ev.title)}</span>`;
+          // 2段表示：1段目に開始時刻、2段目に予定タイトル（終日は時刻なしで名前のみ）
+          pill.innerHTML= ev.time
+            ? `<span class="event-pill-time">${ev.time}</span><span class="event-pill-name">${escHtml(ev.title)}</span>`
+            : `<span class="event-pill-name">${escHtml(ev.title)}</span>`;
         } else {
           const pillTime = ev.time
             ? (ev.timeEnd ? `${ev.time}–${ev.timeEnd}` : ev.time)
@@ -3127,7 +3123,7 @@ applyTheme(isDark);
   if (!panel) return;
   const SWIPE_THRESHOLD = 60;
   const isMobile = () => window.matchMedia('(max-width: 720px)').matches;
-  const TAB_ORDER = ['goal', 'task', 'budget'];
+  const TAB_ORDER = ['budget', 'goal', 'task'];
 
   let startX = 0, startY = 0, tracking = false;
 
@@ -3151,7 +3147,7 @@ applyTheme(isDark);
     if (adx < SWIPE_THRESHOLD || adx <= ady * 1.2) return;     // 水平支配かつ閾値超え
     tracking = false;                                          // 1 ジェスチャ＝1 タブ移動
     const activeBtn = panel.querySelector('.bp-tab.is-active');
-    const cur = activeBtn ? activeBtn.dataset.bp : 'goal';
+    const cur = activeBtn ? activeBtn.dataset.bp : 'budget';
     const idx = TAB_ORDER.indexOf(cur);
     if (idx < 0) return;
     // 右スワイプ（dx > 0）= 前のタブ、左スワイプ（dx < 0）= 次のタブ
@@ -4712,6 +4708,7 @@ const _BUDGET_EXP_CATS_DEFAULT = [
   { id:'clothing',   name:'衣服費', icon:'👕', color:'#9c36b5' },
   { id:'daily',      name:'日用品', icon:'🧴', color:'#0c8599' },
   { id:'education',  name:'教育費', icon:'📚', color:'#087f5b' },
+  { id:'alcohol',    name:'酒',     icon:'🍶', color:'#a61e4d' },
   { id:'other_exp',  name:'その他', icon:'📦', color:'#888' },
 ];
 
@@ -4736,6 +4733,22 @@ function _saveBudgetCats() {
 
 let budgetExpenseCats = _loadBudgetCats('kuro_budget_exp_cats', _BUDGET_EXP_CATS_DEFAULT);
 let budgetIncomeCats  = _loadBudgetCats('kuro_budget_inc_cats', _BUDGET_INC_CATS_DEFAULT);
+
+// 既存ユーザー（localStorage にカテゴリ保存済み）にも「酒」を一度だけ追加する。
+// フラグで一回きりにするので、後からユーザーが削除しても復活しない。
+(function seedAlcoholCat() {
+  try {
+    if (localStorage.getItem('kuro_budget_seed_alcohol')) return;
+    if (!budgetExpenseCats.some(c => c.id === 'alcohol')) {
+      const alcoholCat = { id:'alcohol', name:'酒', icon:'🍶', color:'#a61e4d' };
+      const at = budgetExpenseCats.findIndex(c => c.id === 'other_exp');  // 「その他」の前に挿入
+      if (at >= 0) budgetExpenseCats.splice(at, 0, alcoholCat);
+      else budgetExpenseCats.push(alcoholCat);
+      _saveBudgetCats();
+    }
+    localStorage.setItem('kuro_budget_seed_alcohol', '1');
+  } catch (_) { /* localStorage 不可環境では既定配列に含まれるので無視 */ }
+})();
 
 let _budgetState = null;
 

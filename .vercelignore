@@ -1,0 +1,9 @@
+# Vercel には Web アプリ（karenda-/）だけをアップロードする。
+# Electron デスクトップ版・ビルド成果物・依存は除外（巨大＆不要）。
+desktop
+tests
+.git
+.github
+引継ぎ.md
+ISSUES.md
+README.md

@@ -1400,16 +1400,6 @@ function buildCell(y,m,d,isOther,isToday) {
   // 予定時刻は各予定ピルの1段目に表示するため、日付番号の右の時計アイコンは廃止。
   cell.appendChild(head);
 
-  // 飲酒カウンター（セル右上に絶対配置、0も含めて常に表示、0は薄色、3超で警告色）
-  const drinkCount = dailyDrinks[key] ?? 0;
-  const drinkEl = document.createElement('div');
-  let drinkCls = 'day-drink-count';
-  if (drinkCount === 0) drinkCls += ' is-zero';
-  else if (drinkCount > 3) drinkCls += ' is-warn';
-  drinkEl.className = drinkCls;
-  drinkEl.textContent = `🍺${drinkCount}`;
-  cell.appendChild(drinkEl);
-
   const _hName = getHolidayName(key);
   if (_hName) {
     const hEl = document.createElement('div');
@@ -1419,18 +1409,6 @@ function buildCell(y,m,d,isOther,isToday) {
   }
 
 
-
-  // Day wage badge
-  const shifts=dayEvs.filter(ev=>isShift(ev.catId));
-  if (shifts.length) {
-    const dayPay=shifts.reduce((s,ev)=>s+calcShift(ev).pay,0);
-    const dayWork=shifts.reduce((s,ev)=>s+calcShift(ev).workMinutes,0);
-    const badge=document.createElement('div');
-    badge.className='day-wage-badge';
-    badge.textContent=fmtYen(dayPay);
-    badge.title=`勤務 ${fmtMin(dayWork)}`;
-    cell.appendChild(badge);
-  }
 
   if (dayEvs.length) {
     const evList=document.createElement('div');

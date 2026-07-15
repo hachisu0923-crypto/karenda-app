@@ -1195,17 +1195,25 @@ document.getElementById('js-logout').addEventListener('click', async () => {
 // Auth state listener
 let _appInitialized = false;
 
-if (db) db.auth.onAuthStateChange((event, session) => {
-  if (session?.user) {
-    if (!_appInitialized || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-      _appInitialized = true;
-      showApp(session.user);
+if (db) {
+  db.auth.onAuthStateChange((event, session) => {
+    if (session?.user) {
+      if (!_appInitialized || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        _appInitialized = true;
+        showApp(session.user);
+      }
+    } else {
+      _appInitialized = false;
+      showAuthScreen();
     }
-  } else {
-    _appInitialized = false;
-    showAuthScreen();
-  }
-});
+  });
+} else {
+  // SDK 読み込み失敗時は onAuthStateChange が登録されないため、
+  // js-auth-screen / js-app とも display:none のまま固まってしまう。
+  // フォールバックとしてログイン画面側にエラーを表示する。
+  showAuthScreen();
+  showAuthMsg('Supabase SDK の読み込みに失敗しています。ネットワーク/拡張機能/HTMLの<script>読み込み順を確認してください。', true);
+}
 
 // ── Salary summary ────────────────────────────────────────────────────────────
 

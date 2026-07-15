@@ -200,6 +200,7 @@ input  { font-family: inherit; }
   display: flex;
   flex-direction: column;
   height: 100vh;
+  height: 100dvh;   /* iOS Safari: 100vh assumes the toolbar is collapsed, causing fixed bottom bars to overlap in-flow content */
   overflow: hidden;
 }
 
@@ -2418,11 +2419,15 @@ input  { font-family: inherit; }
 
   /* Layout: stack vertically, full width */
   .layout { flex-direction: column; overflow: hidden; }
-  /* .main は Properties (peek 44 / mid 180) + 下部ナビ 56 分の余白を確保 */
+  /* .main は Properties (peek 44 / mid 180、position:fixed) + 下部ナビ 56 分の
+     余白を確保。Properties が peek のときは 44px 分だけでよい。 */
   .main {
     width: 100%;
     overflow-y: auto;
-    padding-bottom: calc(56px + env(safe-area-inset-bottom));
+    padding-bottom: calc(56px + 180px + env(safe-area-inset-bottom));
+  }
+  .main:has(.bottom-panel.is-peek) {
+    padding-bottom: calc(56px + 44px + env(safe-area-inset-bottom));
   }
   /* タップ可能な月名（タップ＝Today） */
   .viewport-header .topbar-title { cursor: pointer; }
@@ -3519,8 +3524,16 @@ input  { font-family: inherit; }
 /* ── Mobile bottom panel ── */
 @media (max-width: 720px) {
   .bottom-panel::before { display: none; }
-  /* mid（従来）= 180px、peek = ハンドル+タブのみ、is-expanded = 100dvh */
-  .bottom-panel { height: 180px; }
+  /* mid（従来）= 180px、peek = ハンドル+タブのみ、is-expanded = 100dvh。
+     position:fixed で下部ナビの真上に固定（.main の flow/padding 頼みだと
+     iOS standalone(ホーム画面追加) でスクロール位置依存になり被ることがある）。 */
+  .bottom-panel {
+    position: fixed;
+    left: 0;
+    right: 0;
+    height: 180px;
+    z-index: 40;
+  }
   .bottom-panel.is-peek { height: 44px; }
   .bottom-panel.is-peek > .bp-section { display: none !important; }
   .bottom-panel.is-peek .bp-panel-header { padding-top: 0; padding-bottom: 0; }
@@ -3541,7 +3554,11 @@ input  { font-family: inherit; }
     display: flex;
     position: fixed;
     left: 0; right: 0; bottom: 0;
-    height: 56px;
+    /* box-sizing:border-box なので padding-bottom は高さを食う。
+       アイコン+ラベルの表示領域を常に 56px 確保するため、その分を上乗せする
+       （iPhone のホームインジケーター分 env(safe-area-inset-bottom) だけ
+       高さが増える＝表示領域が実機で狭くならない）。 */
+    height: calc(56px + env(safe-area-inset-bottom));
     padding-bottom: env(safe-area-inset-bottom);
     background: var(--color-bg-sidebar);
     border-top: 1px solid var(--color-border-strong);

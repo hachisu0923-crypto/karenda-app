@@ -280,6 +280,33 @@
             </div>
           </div>
         </div>
+        <div class="workspace-tab-header mod-pinned" id="js-tab-budget" data-view="budget" role="tab" aria-selected="false">
+          <div class="workspace-tab-header-inner">
+            <div class="workspace-tab-header-inner-icon"><svg class="svg-icon"><use href="#lucide-wallet"/></svg></div>
+            <div class="workspace-tab-header-inner-title">家計簿</div>
+            <div class="workspace-tab-header-status-container">
+              <div class="workspace-tab-header-status-icon"><svg class="svg-icon"><use href="#lucide-pin"/></svg></div>
+            </div>
+          </div>
+        </div>
+        <div class="workspace-tab-header mod-pinned" id="js-tab-goal" data-view="goal" role="tab" aria-selected="false">
+          <div class="workspace-tab-header-inner">
+            <div class="workspace-tab-header-inner-icon"><svg class="svg-icon"><use href="#lucide-target"/></svg></div>
+            <div class="workspace-tab-header-inner-title">目標</div>
+            <div class="workspace-tab-header-status-container">
+              <div class="workspace-tab-header-status-icon"><svg class="svg-icon"><use href="#lucide-pin"/></svg></div>
+            </div>
+          </div>
+        </div>
+        <div class="workspace-tab-header mod-pinned" id="js-tab-task" data-view="task" role="tab" aria-selected="false">
+          <div class="workspace-tab-header-inner">
+            <div class="workspace-tab-header-inner-icon"><svg class="svg-icon"><use href="#lucide-list-checks"/></svg></div>
+            <div class="workspace-tab-header-inner-title">タスク</div>
+            <div class="workspace-tab-header-status-container">
+              <div class="workspace-tab-header-status-icon"><svg class="svg-icon"><use href="#lucide-pin"/></svg></div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -347,132 +374,94 @@
       </div>
     </div>
 
-  </div><!-- /.mod-root -->
 
-  <!-- ═══ RIGHT SPLIT (Obsidian: mod-right-split) — 家計簿 / 目標 / タスク ═══
-       Obsidian に下部パネルは無いので、DOM は右サイドバーに一本化する。
-       開く向きだけをブレークポイントで変える:
-         >720px  … 右から（Obsidian 忠実）
-         ≤720px  … 下から（意図的な逸脱）
-       ≤720px を右ドロワーにすると .bp-swipe-handle の上スワイプ 3 段階
-       （peek/mid/is-expanded）というモバイルの主要導線が丸ごと消えるため。
-       逸脱は「向き」だけに限定し、背景ぼかし・ドラッグハンドル・上端タブは
-       Obsidian のドロワーの構成要素をそのまま使う。 -->
-  <div class="workspace-split mod-horizontal mod-right-split bottom-panel">
-    <div class="bp-swipe-handle"><span class="bp-swipe-bar"></span></div>
-    <div class="workspace-tab-header-container bp-panel-header">
-      <div class="workspace-tab-header-container-inner bp-tab-bar">
-        <div class="workspace-tab-header is-active bp-tab" data-bp="budget" role="tab" aria-selected="true">
-          <div class="workspace-tab-header-inner">
-            <div class="workspace-tab-header-inner-icon"><svg class="svg-icon"><use href="#lucide-wallet"/></svg></div>
-            <div class="workspace-tab-header-inner-title">家計簿</div>
-          </div>
-        </div>
-        <div class="workspace-tab-header bp-tab" data-bp="goal" role="tab" aria-selected="false">
-          <div class="workspace-tab-header-inner">
-            <div class="workspace-tab-header-inner-icon"><svg class="svg-icon"><use href="#lucide-target"/></svg></div>
-            <div class="workspace-tab-header-inner-title">目標</div>
-          </div>
-        </div>
-        <div class="workspace-tab-header bp-tab" data-bp="task" role="tab" aria-selected="false">
-          <div class="workspace-tab-header-inner">
-            <div class="workspace-tab-header-inner-icon"><svg class="svg-icon"><use href="#lucide-list-checks"/></svg></div>
-            <div class="workspace-tab-header-inner-title">タスク</div>
-          </div>
+    <!-- ── 家計簿 view ── -->
+    <div id="js-budget-view" class="bp-section panel-view" style="display:none">
+      <div class="budget-month-header">
+        <span class="budget-month-label" id="js-budget-month-label"></span>
+        <div class="budget-header-actions">
+          <button class="btn-receipt" id="js-receipt-btn" title="レシートから読み取り"><svg class="svg-icon"><use href="#lucide-camera"/></svg><span>レシート読取</span></button>
+          <button class="btn-receipt-key" id="js-jcb-btn" title="JCBメール自動取込の設定"><svg class="svg-icon"><use href="#lucide-credit-card"/></svg></button>
+          <button class="btn-receipt-key" id="js-open-budget-cat-editor" title="カテゴリを編集"><svg class="svg-icon"><use href="#lucide-tag"/></svg></button>
         </div>
       </div>
-    </div>
-
-      <!-- ── Goal (目標) section ── -->
-      <div id="js-bp-goal" class="bp-section" style="display:none">
-        <div class="goal-date-nav">
-          <button class="goal-nav-btn" id="js-goal-prev">‹</button>
-          <div class="goal-date-display" id="js-goal-date-display"></div>
-          <button class="goal-nav-btn" id="js-goal-next">›</button>
-          <button class="goal-today-btn" id="js-goal-today">Today</button>
-          <button class="goal-reset-btn" id="js-goal-reset" type="button">リセット</button>
-        </div>
-        <div class="goal-list" id="js-goal-list"></div>
-        <form class="bp-add-form" id="js-goal-add-form" autocomplete="off">
-          <input class="bp-add-input" id="js-goal-input" type="text" placeholder="目標を追加…" maxlength="100" />
-          <button class="bp-add-btn" type="submit">追加</button>
-        </form>
-      </div>
-
-      <!-- ── Task section ── -->
-      <div id="js-bp-task" class="bp-section" style="display:none">
-        <div class="bp-section-head">
-          <span class="bp-section-title">タスク</span>
-          <div class="bp-section-head-right">
-            <button class="btn-daily-plan" id="js-daily-plan-btn" title="明日のタスクを計画"><svg class="svg-icon"><use href="#lucide-clipboard-list"/></svg><span>明日の計画</span></button>
-            <span class="bp-progress" id="js-task-progress">0/0</span>
-          </div>
-        </div>
-        <div class="task-filter-bar">
-          <button class="task-filter is-active" data-filter="all">すべて</button>
-          <button class="task-filter" data-filter="active">未完了</button>
-          <button class="task-filter" data-filter="done">完了</button>
-        </div>
-        <div class="task-list" id="js-task-list"></div>
-        <form class="bp-add-form" id="js-task-add-form" autocomplete="off">
-          <input class="bp-add-input" id="js-task-input" type="text" placeholder="タスクを追加…" />
-          <input class="form-input budget-date-input" id="js-task-date" type="date" />
-          <select class="budget-select" id="js-task-priority" style="width:64px">
-            <option value="high">高</option>
-            <option value="medium" selected>中</option>
-            <option value="low">低</option>
+      <div id="js-budget-summary"></div>
+      <form class="budget-add-form" id="js-budget-form" autocomplete="off">
+        <div class="budget-form-row">
+          <select class="budget-select budget-type-select" id="js-budget-type">
+            <option value="expense">支出</option>
+            <option value="income">収入</option>
           </select>
-          <button class="bp-add-btn" type="submit">追加</button>
-        </form>
-      </div>
-
-      <!-- ── Budget (家計簿) section ── -->
-      <div id="js-bp-budget" class="bp-section">
-        <div class="budget-month-header">
-          <span class="budget-month-label" id="js-budget-month-label"></span>
-          <div class="budget-header-actions">
-            <button class="btn-receipt" id="js-receipt-btn" title="レシートから読み取り"><svg class="svg-icon"><use href="#lucide-camera"/></svg><span>レシート読取</span></button>
-            <button class="btn-receipt-key" id="js-jcb-btn" title="JCBメール自動取込の設定"><svg class="svg-icon"><use href="#lucide-credit-card"/></svg></button>
-            <button class="btn-receipt-key" id="js-open-budget-cat-editor" title="カテゴリを編集"><svg class="svg-icon"><use href="#lucide-tag"/></svg></button>
-          </div>
+          <select class="budget-select budget-cat-select" id="js-budget-cat"></select>
+          <input class="bp-add-input budget-amount-input" id="js-budget-amount" type="number"
+                 placeholder="金額" min="1" step="1" inputmode="numeric" />
         </div>
-        <div id="js-budget-summary"></div>
-        <form class="budget-add-form" id="js-budget-form" autocomplete="off">
-          <div class="budget-form-row">
-            <select class="budget-select budget-type-select" id="js-budget-type">
-              <option value="expense">支出</option>
-              <option value="income">収入</option>
-            </select>
-            <select class="budget-select budget-cat-select" id="js-budget-cat"></select>
-            <input class="bp-add-input budget-amount-input" id="js-budget-amount" type="number"
-                   placeholder="金額" min="1" step="1" inputmode="numeric" />
-          </div>
-          <div class="budget-form-row">
-            <input class="form-input budget-date-input" id="js-budget-date" type="date" />
-            <input class="bp-add-input budget-memo-input" id="js-budget-memo" type="text"
-                   placeholder="メモ（任意）" />
-            <label class="budget-repeat-toggle" title="指定した日付を基準に、毎月同じ日に計上します">
-              <input id="js-budget-repeat-monthly" type="checkbox" />
-              <span>毎月</span>
-            </label>
-            <button class="bp-add-btn" type="submit" id="js-budget-submit-btn">追加</button>
-            <button class="bp-add-btn budget-cancel-btn" type="button" id="js-budget-cancel-edit" style="display:none">キャンセル</button>
-          </div>
-        </form>
-        <div class="budget-filter-bar">
-          <button class="budget-filter is-active" data-filter="all">すべて</button>
-          <button class="budget-filter" data-filter="expense">支出</button>
-          <button class="budget-filter" data-filter="income">収入</button>
+        <div class="budget-form-row">
+          <input class="form-input budget-date-input" id="js-budget-date" type="date" />
+          <input class="bp-add-input budget-memo-input" id="js-budget-memo" type="text"
+                 placeholder="メモ（任意）" />
+          <label class="budget-repeat-toggle" title="指定した日付を基準に、毎月同じ日に計上します">
+            <input id="js-budget-repeat-monthly" type="checkbox" />
+            <span>毎月</span>
+          </label>
+          <button class="bp-add-btn" type="submit" id="js-budget-submit-btn">追加</button>
+          <button class="bp-add-btn budget-cancel-btn" type="button" id="js-budget-cancel-edit" style="display:none">キャンセル</button>
         </div>
-        <div class="budget-list" id="js-budget-list"></div>
-        <!-- Hidden file input for receipt camera/upload -->
-        <input type="file" id="js-receipt-file" accept="image/*" style="display:none" />
+      </form>
+      <div class="budget-filter-bar">
+        <button class="budget-filter is-active" data-filter="all">すべて</button>
+        <button class="budget-filter" data-filter="expense">支出</button>
+        <button class="budget-filter" data-filter="income">収入</button>
       </div>
-
+      <div class="budget-list" id="js-budget-list"></div>
+      <!-- Hidden file input for receipt camera/upload -->
+      <input type="file" id="js-receipt-file" accept="image/*" style="display:none" />
     </div>
 
-  </div><!-- /.mod-right-split -->
+    <!-- ── 目標 view ── -->
+    <div id="js-goal-view" class="bp-section panel-view" style="display:none">
+      <div class="goal-date-nav">
+        <button class="goal-nav-btn" id="js-goal-prev">‹</button>
+        <div class="goal-date-display" id="js-goal-date-display"></div>
+        <button class="goal-nav-btn" id="js-goal-next">›</button>
+        <button class="goal-today-btn" id="js-goal-today">Today</button>
+        <button class="goal-reset-btn" id="js-goal-reset" type="button">リセット</button>
+      </div>
+      <div class="goal-list" id="js-goal-list"></div>
+      <form class="bp-add-form" id="js-goal-add-form" autocomplete="off">
+        <input class="bp-add-input" id="js-goal-input" type="text" placeholder="目標を追加…" maxlength="100" />
+        <button class="bp-add-btn" type="submit">追加</button>
+      </form>
+    </div>
 
+    <!-- ── タスク view ── -->
+    <div id="js-task-view" class="bp-section panel-view" style="display:none">
+      <div class="bp-section-head">
+        <span class="bp-section-title">タスク</span>
+        <div class="bp-section-head-right">
+          <button class="btn-daily-plan" id="js-daily-plan-btn" title="明日のタスクを計画"><svg class="svg-icon"><use href="#lucide-clipboard-list"/></svg><span>明日の計画</span></button>
+          <span class="bp-progress" id="js-task-progress">0/0</span>
+        </div>
+      </div>
+      <div class="task-filter-bar">
+        <button class="task-filter is-active" data-filter="all">すべて</button>
+        <button class="task-filter" data-filter="active">未完了</button>
+        <button class="task-filter" data-filter="done">完了</button>
+      </div>
+      <div class="task-list" id="js-task-list"></div>
+      <form class="bp-add-form" id="js-task-add-form" autocomplete="off">
+        <input class="bp-add-input" id="js-task-input" type="text" placeholder="タスクを追加…" />
+        <input class="form-input budget-date-input" id="js-task-date" type="date" />
+        <select class="budget-select" id="js-task-priority" style="width:64px">
+          <option value="high">高</option>
+          <option value="medium" selected>中</option>
+          <option value="low">低</option>
+        </select>
+        <button class="bp-add-btn" type="submit">追加</button>
+      </form>
+    </div>
+
+  </div><!-- /.mod-root -->
 </div><!-- /.workspace -->
 
 <!-- ═══ STATUS BAR ═══
@@ -1114,22 +1103,32 @@
 <!-- ═══════════ MOBILE: FAB (＋ 予定追加) ═══════════ -->
 <button class="fab" id="js-fab-add" type="button" aria-label="予定を追加">＋</button>
 
-<!-- ═══════════ MOBILE TOOLBAR (Obsidian: .mobile-toolbar) ═══════════ -->
+<!-- ═══════════ MOBILE TOOLBAR (Obsidian: .mobile-toolbar) ═══════════
+     Obsidian モバイルのツールバーはアイコンのみ。6ビュー＋タイマーの7個で
+     390px なら各 56px、親指の届く位置に全行き先が残る。
+     サイドバー開閉はタブバー左のハンバーガー (#js-sidebar-toggle) が担うので
+     旧 #js-mbb-more は廃止。 -->
 <nav class="mobile-toolbar mobile-bottombar" id="js-mobile-bottombar" aria-label="ビュー切替">
-  <button class="mobile-toolbar-button mbb-btn is-active" type="button" data-view="month" aria-label="月ビュー">
-    <span class="mobile-toolbar-button-icon mbb-icon"><svg class="svg-icon"><use href="#lucide-calendar-days"/></svg></span><span class="mbb-label">月</span>
+  <button class="mobile-toolbar-button mbb-btn is-active" type="button" data-view="month" aria-label="月ビュー" title="月ビュー">
+    <span class="mobile-toolbar-button-icon mbb-icon"><svg class="svg-icon"><use href="#lucide-calendar-days"/></svg></span>
   </button>
-  <button class="mobile-toolbar-button mbb-btn" type="button" data-view="week" aria-label="週ビュー">
-    <span class="mobile-toolbar-button-icon mbb-icon"><svg class="svg-icon"><use href="#lucide-calendar-range"/></svg></span><span class="mbb-label">週</span>
+  <button class="mobile-toolbar-button mbb-btn" type="button" data-view="week" aria-label="週ビュー" title="週ビュー">
+    <span class="mobile-toolbar-button-icon mbb-icon"><svg class="svg-icon"><use href="#lucide-calendar-range"/></svg></span>
   </button>
-  <button class="mobile-toolbar-button mbb-btn" type="button" data-view="day" aria-label="日ビュー">
-    <span class="mobile-toolbar-button-icon mbb-icon"><svg class="svg-icon"><use href="#lucide-calendar-clock"/></svg></span><span class="mbb-label">日</span>
+  <button class="mobile-toolbar-button mbb-btn" type="button" data-view="day" aria-label="日ビュー" title="日ビュー">
+    <span class="mobile-toolbar-button-icon mbb-icon"><svg class="svg-icon"><use href="#lucide-calendar-clock"/></svg></span>
   </button>
-  <button class="mobile-toolbar-button mbb-btn" type="button" id="js-mbb-more" aria-label="メニュー">
-    <span class="mobile-toolbar-button-icon mbb-icon"><svg class="svg-icon"><use href="#lucide-more-horizontal"/></svg></span><span class="mbb-label">他</span>
+  <button class="mobile-toolbar-button mbb-btn" type="button" data-view="budget" aria-label="家計簿" title="家計簿">
+    <span class="mobile-toolbar-button-icon mbb-icon"><svg class="svg-icon"><use href="#lucide-wallet"/></svg></span>
   </button>
-  <button class="mobile-toolbar-button mbb-btn" type="button" id="js-mbb-timer" aria-label="タイマー">
-    <span class="mobile-toolbar-button-icon mbb-icon"><svg class="svg-icon"><use href="#lucide-timer"/></svg></span><span class="mbb-label">タイマー</span>
+  <button class="mobile-toolbar-button mbb-btn" type="button" data-view="goal" aria-label="目標" title="目標">
+    <span class="mobile-toolbar-button-icon mbb-icon"><svg class="svg-icon"><use href="#lucide-target"/></svg></span>
+  </button>
+  <button class="mobile-toolbar-button mbb-btn" type="button" data-view="task" aria-label="タスク" title="タスク">
+    <span class="mobile-toolbar-button-icon mbb-icon"><svg class="svg-icon"><use href="#lucide-list-checks"/></svg></span>
+  </button>
+  <button class="mobile-toolbar-button mbb-btn" type="button" id="js-mbb-timer" aria-label="タイマー" title="タイマー">
+    <span class="mobile-toolbar-button-icon mbb-icon"><svg class="svg-icon"><use href="#lucide-timer"/></svg></span>
   </button>
 </nav>
 

@@ -118,7 +118,7 @@ let _colorMode     = 'calendar'; // 'calendar' | 'budget_exp' | 'budget_inc'
 let isDark         = loadLocalJSON('cal_dark') ?? true;   // Obsidian の既定はダーク
 let activeTab      = 'event';
 let currentUser    = null;
-let currentView    = 'month';  // 'month' | 'day'
+let currentView    = 'month';  // 'month' | 'week' | 'day' | 'budget' | 'goal' | 'task'
 
 // ── Japan Holidays ─────────────────────────────────────────────────────────────
 
@@ -1034,9 +1034,6 @@ async function showApp(user) {
 
   initTaskPanel(user);
   initBudgetPanel(user);
-  initBottomPanelTabs();
-  initBottomPanelSwipe();
-  initBottomPanelResize();
 
   await loadFromSupabase();
   // 祝日データをフェッチ（今年・来年）してから再描画
@@ -2939,7 +2936,10 @@ function escHtml(s){
 
 // ── Status Bar ────────────────────────────────────────────────────────────────
 
-const VIEW_LABELS = { month: 'Month', week: 'Week', day: 'Day' };
+const VIEW_LABELS = {
+  month: 'Month', week: 'Week', day: 'Day',
+  budget: '家計簿', goal: '目標', task: 'タスク',
+};
 
 function updateStatusBar() {
   const elView   = document.getElementById('js-status-view');
@@ -2965,29 +2965,33 @@ function updateStatusBar() {
 
 // ── Render all ────────────────────────────────────────────────────────────────
 
-// True when the bottom "家計簿/Budget" tab is the active panel.
-function isBudgetPanelVisible(){
-  var t = document.querySelector('.bp-tab.is-active');
-  return !!t && t.dataset.bp === 'budget';
-}
+// 家計簿タブが表示中か。以前は .bp-tab.is-active を見ていたが、右スプリット
+// 廃止でそのクラスが消えた。currentView が唯一の真実になる。
+function isBudgetPanelVisible(){ return currentView === 'budget'; }
 
+// サイドバー（ミニカレンダー・カテゴリ・給料サマリ）はタブと独立して常時見える
+// のでゲートしない。メイン領域は表示中のビューだけ描く。
+// 家計簿のゲートは元からある意図を引き継ぐ: 通常のカレンダー操作で 12ヶ月分の
+// Supabase クエリを撃たないため。
 function renderAll(){
-  renderMain();
   renderMini();
   renderSidebar();
-  if (currentView === 'day')  renderDayView();
-  if (currentView === 'week') renderWeekView();
   updateStatusBar();
 
-  // Keep Task panel in sync
-  if (typeof _taskState !== 'undefined' && _taskState) {
-    renderTaskPanel();
+  switch (currentView) {
+    case 'month':  renderMain(); break;
+    case 'week':   renderWeekView(); break;
+    case 'day':    renderDayView(); break;
+    case 'task':   if (typeof _taskState !== 'undefined' && _taskState) renderTaskPanel(); break;
+    case 'goal':   renderGoalList(); break;
+    case 'budget':
+      if (typeof _budgetState !== 'undefined' && _budgetState) {
+        _syncBudgetMonth().then(function() { renderBudgetPanel(); });
+      }
+      break;
   }
-  // Keep Budget panel in sync — only when it's the visible tab, so routine
-  // calendar navigation doesn't fire the (12-month) budget Supabase query.
-  if (typeof _budgetState !== 'undefined' && _budgetState && isBudgetPanelVisible()) {
-    _syncBudgetMonth().then(function() { renderBudgetPanel(); });
-  }
+  // 非表示のビューはここでは描かない。データ変更側が renderMain() 等を直接
+  // 呼ぶ経路（10箇所以上）は残っているので、タブに戻ったとき内容は最新。
 }
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
@@ -3068,147 +3072,6 @@ _narrowMQL.addEventListener('change', applyPlatformClass);
   document.addEventListener('touchend', () => { tracking = false; }, { passive: true });
 })();
 
-// ── Mobile: Properties パネル内のどこからでも上スワイプで展開 ───────────────
-(function initBottomEdgeSwipe() {
-  const panel = document.querySelector('.bottom-panel');
-  if (!panel) return;
-  const SWIPE_THRESHOLD = 60;    // 上方向の必要移動量
-  const isMobile = () => window.matchMedia('(max-width: 720px)').matches;
-
-  let startX = 0, startY = 0, tracking = false, scrollTarget = null, startScrollTop = 0;
-
-  document.addEventListener('touchstart', e => {
-    if (!isMobile()) return;
-    // モーダル表示中は無効化
-    if (document.querySelector('.overlay.is-open')) { tracking = false; return; }
-    // 既に展開中なら何もしない（collapse は既存ハンドルで対応）
-    if (panel.classList.contains('is-expanded')) { tracking = false; return; }
-    // パネル外は無視（カレンダー本体・サイドバーへの影響を防ぐ）
-    if (!panel.contains(e.target)) { tracking = false; return; }
-    // ハンドルは既存の専用ハンドラに委ねる
-    if (e.target.closest('.bp-swipe-handle')) { tracking = false; return; }
-    const t = e.touches[0];
-    // スクロール可能な祖先（.bp-section）の現在スクロール位置を記録
-    scrollTarget = e.target.closest('.bp-section');
-    startScrollTop = scrollTarget ? scrollTarget.scrollTop : 0;
-    startX = t.clientX;
-    startY = t.clientY;
-    tracking = true;
-  }, { passive: true });
-
-  document.addEventListener('touchmove', e => {
-    if (!tracking) return;
-    const t = e.touches[0];
-    const dx = t.clientX - startX;
-    const dy = startY - t.clientY;                                // 上向きで正
-    if (dy < SWIPE_THRESHOLD || dy <= Math.abs(dx) * 1.2) return;
-    // スクロール領域がスクロールされていた場合は展開発火を抑制（中身のスクロール優先）
-    const currentScroll = scrollTarget ? scrollTarget.scrollTop : 0;
-    if (scrollTarget && (startScrollTop > 0 || currentScroll > 0)) {
-      tracking = false;
-      return;
-    }
-    tracking = false;
-    // 下から一気に full まで開く（peek からでも mid を飛ばす）
-    panel.classList.remove('is-peek');
-    panel.classList.add('is-expanded');
-  }, { passive: true });
-
-  document.addEventListener('touchend', () => { tracking = false; }, { passive: true });
-})();
-
-// ── Mobile: Properties 展開中の下スワイプで縮小 & 月間カレンダーに戻る ───────
-(function initBottomPanelCollapseSwipe() {
-  const panel = document.querySelector('.bottom-panel');
-  if (!panel) return;
-  const SWIPE_THRESHOLD = 60;
-  const isMobile = () => window.matchMedia('(max-width: 720px)').matches;
-
-  let startX = 0, startY = 0, tracking = false, scrollTarget = null, startScrollTop = 0;
-
-  document.addEventListener('touchstart', e => {
-    if (!isMobile()) return;
-    if (document.querySelector('.overlay.is-open')) { tracking = false; return; }
-    // peek 中は下スワイプで何もしない（既に最小）
-    if (panel.classList.contains('is-peek')) { tracking = false; return; }
-    // パネル外は無視
-    if (!panel.contains(e.target)) { tracking = false; return; }
-    // ハンドルは既存 .bp-swipe-handle ハンドラに委ねる
-    if (e.target.closest('.bp-swipe-handle')) { tracking = false; return; }
-    const t = e.touches[0];
-    scrollTarget = e.target.closest('.bp-section');
-    startScrollTop = scrollTarget ? scrollTarget.scrollTop : 0;
-    startX = t.clientX;
-    startY = t.clientY;
-    tracking = true;
-  }, { passive: true });
-
-  document.addEventListener('touchmove', e => {
-    if (!tracking) return;
-    const t = e.touches[0];
-    const dx = t.clientX - startX;
-    const dy = t.clientY - startY;                                // 下向きで正
-    if (dy < SWIPE_THRESHOLD || dy <= Math.abs(dx) * 1.2) return;
-    // スクロール領域がスクロールされていた場合は抑制（スクロール優先）
-    const currentScroll = scrollTarget ? scrollTarget.scrollTop : 0;
-    if (scrollTarget && (startScrollTop > 0 || currentScroll > 0)) {
-      tracking = false;
-      return;
-    }
-    tracking = false;
-    // full から一気に peek へ縮小し、月間カレンダーに戻る
-    panel.classList.remove('is-expanded');
-    panel.classList.add('is-peek');
-    panel.style.height = '';
-    if (typeof switchView === 'function') switchView('month');
-  }, { passive: true });
-
-  document.addEventListener('touchend', () => { tracking = false; }, { passive: true });
-})();
-
-// ── Mobile: Properties パネル内の左右スワイプでタブ切替 ──────────────────────
-(function initBottomPanelHSwipe() {
-  const panel = document.querySelector('.bottom-panel');
-  if (!panel) return;
-  const SWIPE_THRESHOLD = 60;
-  const isMobile = () => window.matchMedia('(max-width: 720px)').matches;
-  const TAB_ORDER = ['budget', 'goal', 'task'];
-
-  let startX = 0, startY = 0, tracking = false;
-
-  document.addEventListener('touchstart', e => {
-    if (!isMobile()) return;
-    if (document.querySelector('.overlay.is-open')) { tracking = false; return; }
-    if (!panel.contains(e.target)) { tracking = false; return; }
-    if (e.target.closest('.bp-swipe-handle')) { tracking = false; return; }
-    const t = e.touches[0];
-    startX = t.clientX;
-    startY = t.clientY;
-    tracking = true;
-  }, { passive: true });
-
-  document.addEventListener('touchmove', e => {
-    if (!tracking) return;
-    const t = e.touches[0];
-    const dx = t.clientX - startX;
-    const dy = t.clientY - startY;
-    const adx = Math.abs(dx), ady = Math.abs(dy);
-    if (adx < SWIPE_THRESHOLD || adx <= ady * 1.2) return;     // 水平支配かつ閾値超え
-    tracking = false;                                          // 1 ジェスチャ＝1 タブ移動
-    const activeBtn = panel.querySelector('.bp-tab.is-active');
-    const cur = activeBtn ? activeBtn.dataset.bp : 'budget';
-    const idx = TAB_ORDER.indexOf(cur);
-    if (idx < 0) return;
-    // 右スワイプ（dx > 0）= 前のタブ、左スワイプ（dx < 0）= 次のタブ
-    const next = dx > 0 ? idx - 1 : idx + 1;
-    if (next < 0 || next >= TAB_ORDER.length) return;          // 端は循環しない
-    const targetBtn = panel.querySelector(`.bp-tab[data-bp="${TAB_ORDER[next]}"]`);
-    if (targetBtn) targetBtn.click();                          // 既存ハンドラに委ねる
-  }, { passive: true });
-
-  document.addEventListener('touchend', () => { tracking = false; }, { passive: true });
-})();
-
 // ── iOS Safari ピンチ/ダブルタップ拡大の完全抑止 ────────────────────────
 ['gesturestart', 'gesturechange', 'gestureend'].forEach(ev => {
   document.addEventListener(ev, e => e.preventDefault(), { passive: false });
@@ -3251,11 +3114,25 @@ const DAY_END   = 24;       // 24:00
 
 // ── View tab switching ────────────────────────────────────
 
+// 6つのビューはそれぞれ1つのリーフ内要素。tab / mobile-toolbar の data-view と
+// この表のキーが唯一の対応表になる（以前は id 指定のリスナーと [data-view] の
+// ループが二重管理だった）。
+const VIEW_ELS = {
+  month:  'js-month-view',
+  week:   'js-week-view',
+  day:    'js-day-view',
+  budget: 'js-budget-view',
+  goal:   'js-goal-view',
+  task:   'js-task-view',
+};
+
 function switchView(view) {
+  if (!VIEW_ELS[view]) return;
   currentView = view;
-  document.getElementById('js-month-view').style.display = view === 'month' ? '' : 'none';
-  document.getElementById('js-week-view').style.display  = view === 'week'  ? '' : 'none';
-  document.getElementById('js-day-view').style.display   = view === 'day'   ? '' : 'none';
+  for (const [k, id] of Object.entries(VIEW_ELS)) {
+    const el = document.getElementById(id);
+    if (el) el.style.display = k === view ? '' : 'none';
+  }
   document.querySelectorAll('.workspace-tab-header[data-view]').forEach(b => {
     const on = b.dataset.view === view;
     b.classList.toggle('is-active', on);
@@ -3263,6 +3140,8 @@ function switchView(view) {
   });
   document.querySelectorAll('.mbb-btn[data-view]').forEach(b => b.classList.toggle('is-active', b.dataset.view === view));
   updateStatusBar();
+  // 開いたビューをその場で描く（非表示中は renderAll がゲートするため）。
+  if (view === 'month') renderMain();
   if (view === 'day') {
     dvDate = new Date(curDate);
     renderDayView();
@@ -3271,18 +3150,19 @@ function switchView(view) {
     wvDate = new Date(curDate);
     renderWeekView();
   }
+  if (view === 'budget') {
+    // 家計簿の Supabase 取得はタブを開いたときだけ。以前は .bp-tab の click が
+    // 唯一の呼び出し口で、タブ化で消える経路だった。
+    if (_budgetState) _syncBudgetMonth().then(renderBudgetPanel);
+  }
+  if (view === 'task')  { if (_taskState) renderTaskPanel(); }
+  if (view === 'goal')  { renderGoalList(); }
 }
 
-document.getElementById('js-tab-month').addEventListener('click', () => switchView('month'));
-document.getElementById('js-tab-week').addEventListener('click',  () => switchView('week'));
-document.getElementById('js-tab-day').addEventListener('click',   () => switchView('day'));
-
-// ── Mobile bottom navigation: View tabs + FAB + 月名タップで Today ─────────
-document.querySelectorAll('.mbb-btn[data-view]').forEach(btn => {
+// タブとモバイルツールバーは同じ data-view を持つ。id 個別指定のリスナーは
+// 廃止（HTML から id を消した瞬間に ?. 無しで TypeError になっていた）。
+document.querySelectorAll('.workspace-tab-header[data-view], .mbb-btn[data-view]').forEach(btn => {
   btn.addEventListener('click', () => switchView(btn.dataset.view));
-});
-document.getElementById('js-mbb-more')?.addEventListener('click', () => {
-  document.getElementById('js-sidebar-toggle')?.click();
 });
 
 // ── タイマー（カウントダウン / ポモドーロ）─────────────────────────────────
@@ -3479,10 +3359,6 @@ document.getElementById('js-fab-add')?.addEventListener('click', () => {
 document.getElementById('js-topbar-title')?.addEventListener('click', () => {
   document.getElementById('js-today')?.click();
 });
-// 初期状態：スマホでは Properties を peek に
-if (window.matchMedia('(max-width: 720px)').matches) {
-  document.querySelector('.bottom-panel')?.classList.add('is-peek');
-}
 
 // ── Day view navigation ───────────────────────────────────
 
@@ -4007,137 +3883,11 @@ function getWeekKeyFromDate(date){
 //  BOTTOM PANEL TABS
 // ════════════════════════════════════════════════════════════
 
-function initBottomPanelTabs() {
-  const tabs = document.querySelectorAll('.bp-tab');
-  tabs.forEach(btn => {
-    btn.addEventListener('click', () => {
-      const target = btn.dataset.bp;
-      tabs.forEach(b => b.classList.toggle('is-active', b === btn));
-      document.getElementById('js-bp-task').style.display   = target === 'task'   ? '' : 'none';
-      document.getElementById('js-bp-budget').style.display = target === 'budget' ? '' : 'none';
-      document.getElementById('js-bp-goal').style.display   = target === 'goal'   ? '' : 'none';
-      if (target === 'budget') _syncBudgetMonth().then(renderBudgetPanel);
-    });
-  });
-}
-
 // ════════════════════════════════════════════════════════════
 //  BOTTOM PANEL SWIPE (mobile)
 // ════════════════════════════════════════════════════════════
 
-function initBottomPanelSwipe() {
-  const panel = document.querySelector('.bottom-panel');
-  const handle = document.querySelector('.bp-swipe-handle');
-  if (!panel || !handle) return;
-
-  let startY = 0;
-  let dragging = false;
-
-  handle.addEventListener('touchstart', e => {
-    startY = e.touches[0].clientY;
-    dragging = true;
-    panel.style.transition = 'none';
-  }, { passive: true });
-
-  // peek ↔ full の 2 段階。switchToMonth=true のときだけ月間ビューへ戻す
-  const goPeek = (switchToMonth) => {
-    panel.classList.remove('is-expanded');
-    panel.classList.add('is-peek');
-    panel.style.height = '';
-    if (switchToMonth && typeof switchView === 'function') switchView('month');
-  };
-  const goFull = () => {
-    panel.classList.remove('is-peek');
-    panel.classList.add('is-expanded');
-    panel.style.height = '';
-  };
-
-  handle.addEventListener('touchmove', e => {
-    if (!dragging) return;
-    e.preventDefault();
-    const dy = startY - e.touches[0].clientY;
-    if (panel.classList.contains('is-expanded')) {
-      // 展開時: 下にドラッグで閉じるプレビュー
-      const top = Math.max(0, -dy);
-      panel.style.transform = `translateY(${top}px)`;
-    } else {
-      // peek: 上にドラッグで full へ向かうプレビュー
-      const lift = Math.max(0, dy);
-      panel.style.height = `${Math.min(window.innerHeight, 44 + lift)}px`;
-    }
-  }, { passive: false });
-
-  handle.addEventListener('touchend', e => {
-    if (!dragging) return;
-    dragging = false;
-    const dy = startY - e.changedTouches[0].clientY;
-    const wasExpanded = panel.classList.contains('is-expanded');
-
-    panel.style.transition = '';
-    panel.style.transform = '';
-    panel.style.height = '';
-
-    // タップ判定（縦移動 6px 未満）：peek ↔ full トグル（タップ縮小では view を変えない）
-    if (Math.abs(dy) < 6) {
-      if (wasExpanded) goPeek(false);
-      else goFull();
-      return;
-    }
-
-    if (wasExpanded) {
-      // 展開中に下スワイプ → 一気に peek（月間ビューへ）
-      if (dy < -80) goPeek(true);
-    } else {
-      // peek 中に上スワイプ → 一気に full
-      if (dy > 60) goFull();
-    }
-  }, { passive: true });
-
-  // マウス操作（PC のスマホプレビュー等）でもハンドルで開閉できるよう click でトグル。
-  // 実機ではタップ後に合成 click が発火するため、直近の touch は無視して二重トグルを防ぐ。
-  let lastTouchEnd = 0;
-  handle.addEventListener('touchend', () => { lastTouchEnd = Date.now(); }, { passive: true });
-  handle.addEventListener('click', () => {
-    if (Date.now() - lastTouchEnd < 600) return;   // タッチ由来の合成 click は無視
-    if (panel.classList.contains('is-expanded')) goPeek(false);
-    else goFull();
-  });
-}
-
 /* ── Desktop: free-drag vertical resize ── */
-function initBottomPanelResize() {
-  const panel = document.querySelector('.bottom-panel');
-  if (!panel) return;
-
-  let dragging = false;
-  let startY = 0;
-  let startH = 0;
-  const MIN_H = 100;
-
-  panel.addEventListener('mousedown', e => {
-    const rect = panel.getBoundingClientRect();
-    if (e.clientY - rect.top > 6) return;
-    dragging = true;
-    startY = e.clientY;
-    startH = panel.offsetHeight;
-    panel.classList.add('is-resizing');
-    e.preventDefault();
-  });
-
-  document.addEventListener('mousemove', e => {
-    if (!dragging) return;
-    const maxH = window.innerHeight * 0.8;
-    const dy = startY - e.clientY;
-    const newH = Math.min(maxH, Math.max(MIN_H, startH + dy));
-    panel.style.height = newH + 'px';
-  });
-
-  document.addEventListener('mouseup', () => {
-    if (!dragging) return;
-    dragging = false;
-    panel.classList.remove('is-resizing');
-  });
-}
 
 
 // ════════════════════════════════════════════════════════════
@@ -4251,6 +4001,13 @@ function _formatGoalDate(dateStr) {
   return base;
 }
 
+// 目標タブに切り替えたとき描き直せるよう、initGoalPanel 内のクロージャ
+// renderGoalList への参照だけをモジュールスコープに引き上げる。task/budget が
+// _taskState/_budgetState を持つのに goal だけ持たない非対称は、データ構造を
+// 変えずに済ませるため今回は解消しない。パネル未初期化のときは何もしない。
+let _renderGoalList = null;
+function renderGoalList() { if (_renderGoalList) _renderGoalList(); }
+
 function initGoalPanel(userId) {
   const listEl   = document.getElementById('js-goal-list');
   const display  = document.getElementById('js-goal-date-display');
@@ -4260,6 +4017,9 @@ function initGoalPanel(userId) {
   const nextBtn  = document.getElementById('js-goal-next');
   const todayBtn = document.getElementById('js-goal-today');
   if (!listEl || !display) return;
+
+  // 下の renderGoalList（関数宣言なので巻き上げ済み）を外から呼べるようにする。
+  _renderGoalList = renderGoalList;
 
   // デフォルトは明日（前日に翌日の目標を設定できる）
   let currentDate = _dateAddDays(_todayStr(), 1);

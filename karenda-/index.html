@@ -10,12 +10,15 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="My Calendar" />
-  <meta name="theme-color" content="#4f8ef7" />
+  <!-- Obsidian の --color-accent = hsl(258, 88%, 66%) -->
+  <meta name="theme-color" content="#8a5cf5" />
   <link rel="stylesheet" href="style.css" />
   <!-- Supabase JS SDK (pinned + Subresource Integrity) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.108.2" integrity="sha384-JWEyvHh+lRf0sN/WWY+QTQwX+CyWqmNg4tkc8GQzAMEtR2wGNrCJlvnu1lHD1kDm" crossorigin="anonymous"></script>
 </head>
-<body>
+<!-- theme-dark は app.js の isDark 既定値と一致させること。CSP でインライン
+     script が使えないため、静的クラスが初回ペイントのちらつきを防ぐ唯一の手段。 -->
+<body class="theme-dark">
 
 <!-- ═══════════ AUTH SCREEN ═══════════ -->
 <div id="js-auth-screen" class="auth-screen" style="display:none">

@@ -1,167 +1,358 @@
 /* ============================================================
-   TYPOGRAPHY — Blender uses DejaVu Sans as its UI font
-   ============================================================ */
-@import url('https://fonts.cdnfonts.com/css/dejavu-sans');
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+   OBSIDIAN DESIGN TOKENS
 
-/* ============================================================
-   COLOR TOKENS — Blender Dark Theme (default)
-   Blender UI color palette: charcoal grays + blue accent + orange highlight
+   値は推測ではなく、インストール済み Obsidian 本体の app.css
+   (resources/obsidian.asar) から抽出した実測値。
+   構成も Obsidian に合わせている:
+     :root           … テーマ非依存（accent HSL / 寸法 / フォント）
+     body.theme-dark … 色ランプ（--color-base-00…100）と暗色オーバーライド
+     body.theme-light… 同上の明色版
+     body            … ランプから意味トークンを導出（--background-primary 等）
+                       ＋ 旧 Blender トークンの互換シム
+
+   テーマクラスは Obsidian と同じく <body> に付く。カスタムプロパティは
+   下方向にしか継承しないため、シムを :root に置くと html 上で
+   未解決になる。必ず body に置くこと。
    ============================================================ */
+
 :root {
-  /* — Blender Dark Backgrounds — */
-  --color-bg-base:        #282828;   /* primary viewport bg */
-  --color-bg-sidebar:     #1e1e1e;   /* darker sidebar / N-panel */
-  --color-bg-hover:       #3a3a3a;   /* hover state */
-  --color-bg-today:       #1f2d40;   /* today highlight (blue tint) */
-  --color-bg-cell-alt:    #252525;   /* alternate cell */
-  --color-bg-wage:        #1a2a1f;   /* wage/income panel */
-  --color-bg-panel:       #353535;   /* panel body bg */
-  --color-bg-header:      #3f3f3f;   /* panel/topbar header bg */
-  --color-bg-input:       #1d1d1d;   /* input fields */
+  /* — Accent: Obsidian 既定の紫 — */
+  --accent-h: 258;
+  --accent-s: 88%;
+  --accent-l: 66%;
 
-  /* — Blender Borders — */
-  --color-border-strong:  #555555;   /* main dividers */
-  --color-border-soft:    #3a3a3a;   /* subtle borders */
-  --color-border-panel:   #454545;   /* panel borders */
+  /* — Fonts —
+     Obsidian の --font-default / --font-monospace-default をそのまま採り、
+     日本語フォントを追記。Obsidian 自身も日本語はシステムフォントに落とす。 */
+  --font-default: ui-sans-serif, -apple-system, BlinkMacSystemFont, system-ui,
+                  'Segoe UI', Roboto, 'Inter Variable', 'Inter',
+                  'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', YuGothic, 'Meiryo',
+                  'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', sans-serif;
+  --font-monospace-default: ui-monospace, SFMono-Regular, 'Cascadia Mono', 'Roboto Mono',
+                            'DejaVu Sans Mono', 'Liberation Mono', Menlo, Monaco,
+                            'Consolas', 'Source Code Pro', monospace;
+  --font-interface: var(--font-default);
+  --font-monospace: var(--font-monospace-default);
 
-  /* — Text — */
-  --color-text-primary:   #e5e5e5;   /* main text */
-  --color-text-secondary: #a0a0a0;   /* secondary / labels */
-  --color-text-disabled:  #565656;   /* disabled */
+  /* — Font sizes / weights — */
+  --font-ui-smaller: 12px;
+  --font-ui-small:   13px;
+  --font-ui-medium:  15px;
+  --font-ui-large:   20px;
+  --font-normal:   400;
+  --font-medium:   500;
+  --font-semibold: 600;
+  --font-bold:     700;
+  --font-weight: var(--font-normal);
+  --line-height-normal: 1.5;
 
-  /* — Blender Accent Colors — */
-  --color-accent:         #4772b3;   /* Blender blue selection */
-  --color-accent-hover:   #5a84cc;   /* lighter blue on hover */
-  --color-accent-subtle:  #1e2d42;   /* subtle blue tint */
-  --color-accent-orange:  #fdaf2d;   /* Blender orange highlight */
-  --color-accent-orange-subtle: #3a2a0a; /* orange tint bg */
+  /* — Radii — */
+  --radius-s:  4px;
+  --radius-m:  8px;
+  --radius-l:  12px;
+  --radius-xl: 16px;
+  --input-radius:  5px;
+  --button-radius: var(--input-radius);
+  --modal-radius:  var(--radius-l);
+  --tab-radius:        var(--radius-s);
+  --tab-radius-active: 6px 6px 0 0;
+  --nav-item-radius:   var(--radius-s);
 
-  /* — Positive (wage / pay) — */
-  --color-positive:       #78c97a;   /* muted green */
-  --color-positive-bg:    #1a2a1c;
-  --color-positive-border:#2a4a2c;
+  /* — Spacing (Obsidian の4pxスケール) — */
+  --size-2-1: 2px;  --size-2-2: 4px;  --size-2-3: 6px;
+  --size-4-1: 4px;  --size-4-2: 8px;  --size-4-3: 12px; --size-4-4: 16px;
+  --size-4-5: 20px; --size-4-6: 24px; --size-4-8: 32px; --size-4-9: 36px;
+  --size-4-10: 40px; --size-4-12: 48px; --size-4-16: 64px; --size-4-18: 72px;
 
-  /* — Danger — */
-  --color-danger:         #e05555;
-  --color-danger-subtle:  #2a1515;
+  /* — Icons (Lucide) — */
+  --icon-xs: 14px; --icon-s: 16px; --icon-m: 18px; --icon-l: 18px; --icon-xl: 32px;
+  --icon-xs-stroke-width: 2px;    --icon-s-stroke-width: 2px;
+  --icon-m-stroke-width:  1.75px; --icon-l-stroke-width: 1.75px;
+  --icon-xl-stroke-width: 1.25px;
+  --icon-size:   var(--icon-m);
+  --icon-stroke: var(--icon-m-stroke-width);
+  --icon-opacity: 0.85;
 
-  /* — Weekend — */
-  --color-sun:            #e07070;   /* muted red for Sunday */
-  --color-sat:            #6a9fd8;   /* muted blue for Saturday */
+  /* — Borders / dividers — */
+  --border-width: 1px;
+  --divider-width: 1px;
+  --divider-width-hover: 3px;
 
-  /* — Overlay / shadows — */
-  --color-overlay:        rgba(0, 0, 0, 0.65);
-  --shadow-sm:            0 1px 2px rgba(0,0,0,0.5);
-  --shadow-md:            0 4px 12px rgba(0,0,0,0.6), 0 1px 3px rgba(0,0,0,0.4);
+  /* — Shell —
+     --header-height は Obsidian 既定 40px だが、このアプリは常にモバイル幅
+     (390px) で情報密度が要るため、旧 --panel-header-h と同じ 26px に据え置く。
+     密度の調整はこのトークン1つで行う。 */
+  --header-height: 26px;
+  --ribbon-width: 44px;
+  --status-bar-font-size: var(--font-ui-smaller);
+  --status-bar-radius: var(--radius-m) 0 0 0;
+  --nav-item-size: var(--font-ui-small);
 
   /* — Scrollbar — */
-  --color-scrollbar:      #4a4a4a;
+  --scrollbar-radius: var(--radius-l);
 
-  /* — Theme icon — */
-  --icon-theme: "☀️";
+  /* — Touch (Obsidian モバイル) — */
+  --touch-size-xxs: 24px; --touch-size-xs: 30px; --touch-size-s: 40px;
+  --touch-size-m:   44px; --touch-size-l:  52px; --touch-size-xl: 60px;
+  --touch-radius-xs: var(--touch-size-xs);
+  --touch-radius-s:  var(--touch-size-s);
 
-  /* — Blender 5.x border-radius (pill-based UI) — */
-  --radius-sm:  3px;
-  --radius-md:  5px;
-  --radius-lg:  8px;
-  --radius-pill: 20px;   /* Blender 5.0+ pill tabs */
+  /* — Animations — */
+  --anim-duration-superfast: 70ms;
+  --anim-duration-fast:      140ms;
+  --anim-duration-moderate:  300ms;
+  --anim-motion-smooth: cubic-bezier(0.45, 0.05, 0.55, 0.95);
 
-  /* — Blender Panel System — */
-  --color-bg-menubar:       #1f1f1f;
-  --color-bg-panel-header:  #2d2d2d;
-  --color-bg-status:        #1a1a1a;
-  --color-separator:        #141414;
-  --color-grip:             #5a5a5a;
-  --color-wire:             #3c3c3c;
-
-  /* — Workspace Tabs (5.0 pill style) — */
-  --color-bg-workspace-tab:        transparent;
-  --color-bg-workspace-tab-hover:  rgba(255,255,255,0.06);
-  --color-bg-workspace-tab-active: #404040;
-  --color-workspace-tab-border:    transparent;
-
-  /* — Flat Buttons (5.x — no emboss) — */
-  --color-btn:        #393939;
-  --color-btn-hover:  #474747;
-  --color-btn-active: #2c2c2c;
-  --color-btn-border: rgba(0,0,0,0.25);
-
-  /* — Panel header height — */
-  --panel-header-h:  26px;
+  /* — 旧トークンのうち Obsidian に対応概念が無いもの（Phase 3 で解消予定） — */
+  --radius-pill: 20px;
 }
 
 /* ============================================================
-   LIGHT MODE — Notion-like bright theme as alternative
+   COLOR RAMPS — Obsidian 標準テーマ（app.css 実測値）
    ============================================================ */
-[data-theme="light"] {
-  /* — Backgrounds — */
-  --color-bg-base:        #f0f0f0;
-  --color-bg-sidebar:     #e8e8e8;
-  --color-bg-hover:       #d8d8d8;
-  --color-bg-today:       #cce0ff;
-  --color-bg-cell-alt:    #ebebeb;
-  --color-bg-wage:        #e0f5e8;
-  --color-bg-panel:       #e4e4e4;
-  --color-bg-header:      #d0d0d0;
-  --color-bg-input:       #ffffff;
+body.theme-dark {
+  color-scheme: dark;
+  --mono-rgb-0:   0, 0, 0;
+  --mono-rgb-100: 255, 255, 255;
 
-  /* — Borders — */
-  --color-border-strong:  #aaaaaa;
-  --color-border-soft:    #cccccc;
-  --color-border-panel:   #b8b8b8;
+  --color-red-rgb:    251, 70, 76;    --color-red:    #fb464c;
+  --color-orange-rgb: 233, 151, 63;   --color-orange: #e9973f;
+  --color-yellow-rgb: 224, 222, 113;  --color-yellow: #e0de71;
+  --color-green-rgb:  68, 207, 110;   --color-green:  #44cf6e;
+  --color-cyan-rgb:   83, 223, 221;   --color-cyan:   #53dfdd;
+  --color-blue-rgb:   2, 122, 255;    --color-blue:   #027aff;
+  --color-purple-rgb: 168, 130, 255;  --color-purple: #a882ff;
+  --color-pink-rgb:   250, 153, 205;  --color-pink:   #fa99cd;
+
+  --color-base-00:  #1e1e1e;
+  --color-base-05:  #212121;
+  --color-base-10:  #242424;
+  --color-base-20:  #262626;
+  --color-base-25:  #2a2a2a;
+  --color-base-30:  #363636;
+  --color-base-35:  #3f3f3f;
+  --color-base-40:  #555555;
+  --color-base-50:  #666666;
+  --color-base-60:  #999999;
+  --color-base-70:  #b3b3b3;
+  --color-base-100: #dadada;
+
+  --color-accent-hsl: var(--accent-h), var(--accent-s), var(--accent-l);
+  --color-accent:   hsl(var(--accent-h), var(--accent-s), var(--accent-l));
+  --color-accent-1: hsl(calc(var(--accent-h) - 3), calc(var(--accent-s) * 1.02), calc(var(--accent-l) * 1.15));
+  --color-accent-2: hsl(calc(var(--accent-h) - 5), calc(var(--accent-s) * 1.05), calc(var(--accent-l) * 1.29));
+
+  --background-modifier-form-field: var(--color-base-25);
+  --background-secondary-alt:       var(--color-base-30);
+  --interactive-normal: var(--color-base-30);
+  --interactive-hover:  var(--color-base-35);
+  --text-accent:              var(--color-accent-1);
+  --interactive-accent:       var(--color-accent);
+  --interactive-accent-hover: var(--color-accent-1);
+  --background-modifier-box-shadow: rgba(0, 0, 0, 0.3);
+  --background-modifier-cover:      rgba(10, 10, 10, 0.4);
+  --text-selection: hsla(var(--interactive-accent-hsl), 0.33);
+
+  --shadow-edges: 0 0 transparent;
+  --shadow-xs: 0 1px 6px rgba(0, 0, 0, 0.045), 0 4px 24px rgba(0, 0, 0, 0.195), var(--shadow-edges);
+  --shadow-s:  0px 1px 2px rgba(0, 0, 0, 0.121), 0px 3.4px 6.7px rgba(0, 0, 0, 0.179), 0px 15px 30px rgba(0, 0, 0, 0.3);
+  --shadow-l:  0px 1.8px 7.3px rgba(0, 0, 0, 0.071), 0px 6.3px 24.7px rgba(0, 0, 0, 0.112), 0px 30px 90px rgba(0, 0, 0, 0.2);
+}
+
+body.theme-light {
+  color-scheme: light;
+  --mono-rgb-0:   255, 255, 255;
+  --mono-rgb-100: 0, 0, 0;
+
+  --color-red-rgb:    233, 49, 71;   --color-red:    #e93147;
+  --color-orange-rgb: 236, 117, 0;   --color-orange: #ec7500;
+  --color-yellow-rgb: 224, 172, 0;   --color-yellow: #e0ac00;
+  --color-green-rgb:  8, 185, 78;    --color-green:  #08b94e;
+  --color-cyan-rgb:   0, 191, 188;   --color-cyan:   #00bfbc;
+  --color-blue-rgb:   8, 109, 221;   --color-blue:   #086ddd;
+  --color-purple-rgb: 120, 82, 238;  --color-purple: #7852ee;
+  --color-pink-rgb:   213, 57, 132;  --color-pink:   #d53984;
+
+  --color-base-00:  #ffffff;
+  --color-base-05:  #fcfcfc;
+  --color-base-10:  #fafafa;
+  --color-base-20:  #f6f6f6;
+  --color-base-25:  #e3e3e3;
+  --color-base-30:  #e0e0e0;
+  --color-base-35:  #d4d4d4;
+  --color-base-40:  #bdbdbd;
+  --color-base-50:  #ababab;
+  --color-base-60:  #707070;
+  --color-base-70:  #5c5c5c;
+  --color-base-100: #222222;
+
+  --color-accent-hsl: var(--accent-h), var(--accent-s), var(--accent-l);
+  --color-accent:   hsl(var(--accent-h), var(--accent-s), var(--accent-l));
+  --color-accent-1: hsl(calc(var(--accent-h) - 1), calc(var(--accent-s) * 1.01), calc(var(--accent-l) * 1.075));
+  --color-accent-2: hsl(calc(var(--accent-h) - 3), calc(var(--accent-s) * 1.02), calc(var(--accent-l) * 1.15));
+
+  --background-secondary-alt:       var(--color-base-05);
+  --background-modifier-box-shadow: rgba(0, 0, 0, 0.1);
+  --background-modifier-cover:      rgba(220, 220, 220, 0.4);
+
+  --shadow-edges: 0 0 transparent;
+  --shadow-xs: 0 1px 6px rgba(0, 0, 0, 0.015), 0 4px 24px rgba(0, 0, 0, 0.065), var(--shadow-edges);
+  --shadow-s:  0px 1px 2px rgba(0, 0, 0, 0.028), 0px 3.4px 6.7px rgba(0, 0, 0, 0.042), 0px 15px 30px rgba(0, 0, 0, 0.07);
+  --shadow-l:  0px 1.8px 7.3px rgba(0, 0, 0, 0.071), 0px 6.3px 24.7px rgba(0, 0, 0, 0.112), 0px 15px 30px rgba(0, 0, 0, 0.1);
+}
+
+/* ============================================================
+   SEMANTIC MAPPINGS — ランプから導出（Obsidian の body ブロック相当）
+   .theme-dark / .theme-light は同じ body 要素に付くので、上のランプが
+   ここで解決される。特異度は .theme-* (0,1,0) > body (0,0,1) なので、
+   両方で定義したトークンはテーマ側が勝つ（Obsidian と同じ挙動）。
+   ============================================================ */
+body {
+  /* — Backgrounds — */
+  --background-primary:     var(--color-base-00);
+  --background-primary-alt: var(--color-base-10);
+  --background-secondary:   var(--color-base-20);
+  --background-modifier-hover:        rgba(var(--mono-rgb-100), 0.067);
+  --background-modifier-active-hover: hsla(var(--interactive-accent-hsl), 0.1);
+  --background-modifier-border:        var(--color-base-30);
+  --background-modifier-border-hover:  var(--color-base-35);
+  --background-modifier-border-focus:  var(--color-base-40);
+  --background-modifier-error-rgb: var(--color-red-rgb);
+  --background-modifier-error:     var(--color-red);
+  --background-modifier-success:   var(--color-green);
+
+  /* — Inputs — */
+  --background-modifier-form-field: var(--color-base-00);
 
   /* — Text — */
-  --color-text-primary:   #1a1a1a;
-  --color-text-secondary: #555555;
-  --color-text-disabled:  #aaaaaa;
+  --text-normal: var(--color-base-100);
+  --text-muted:  var(--color-base-70);
+  --text-faint:  var(--color-base-50);
+  --text-on-accent: white;
+  --text-error:   var(--color-red);
+  --text-warning: var(--color-orange);
+  --text-success: var(--color-green);
+  --text-selection: hsla(var(--color-accent-hsl), 0.2);
+  --text-accent:       var(--color-accent);
+  --text-accent-hover: var(--color-accent-2);
 
-  /* — Accent — */
-  --color-accent:         #4772b3;
-  --color-accent-hover:   #3a5fa0;
-  --color-accent-subtle:  #ccdaee;
-  --color-accent-orange:  #e0900a;
-  --color-accent-orange-subtle: #fdefd0;
+  /* — Interactive — */
+  --interactive-normal: var(--color-base-00);
+  --interactive-hover:  var(--color-base-10);
+  --interactive-accent-hsl:   var(--color-accent-hsl);
+  --interactive-accent:       var(--color-accent-1);
+  --interactive-accent-hover: var(--color-accent-2);
 
-  /* — Positive — */
-  --color-positive:       #2a8a3a;
-  --color-positive-bg:    #e8f8ec;
-  --color-positive-border:#a0d8b0;
-
-  /* — Danger — */
-  --color-danger:         #cc2222;
-  --color-danger-subtle:  #ffe0e0;
-
-  /* — Weekend — */
-  --color-sun:            #cc2222;
-  --color-sat:            #2255aa;
-
-  /* — Overlay / shadows — */
-  --color-overlay:        rgba(0, 0, 0, 0.3);
-  --shadow-sm:            0 1px 3px rgba(0,0,0,0.12), 0 1px 6px rgba(0,0,0,0.08);
-  --shadow-md:            0 4px 14px rgba(0,0,0,0.15), 0 1px 4px rgba(0,0,0,0.1);
+  /* — Shell surfaces — */
+  --divider-color: var(--background-modifier-border);
+  --ribbon-background: var(--background-secondary);
+  --status-bar-background:   var(--background-secondary);
+  --status-bar-text-color:   var(--text-muted);
+  --status-bar-border-color: var(--divider-color);
+  --tab-background-active: var(--background-primary);
+  --tab-text-color:        var(--text-faint);
+  --tab-text-color-active: var(--text-muted);
+  --modal-background: var(--background-primary);
+  --nav-item-color:            var(--text-muted);
+  --nav-item-color-hover:      var(--text-normal);
+  --nav-item-background-hover: var(--background-modifier-hover);
 
   /* — Scrollbar — */
-  --color-scrollbar:      #aaaaaa;
+  --scrollbar-bg:              rgba(var(--mono-rgb-100), 0.05);
+  --scrollbar-thumb-bg:        rgba(var(--mono-rgb-100), 0.1);
+  --scrollbar-active-thumb-bg: rgba(var(--mono-rgb-100), 0.2);
 
-  /* — Theme icon — */
-  --icon-theme: "🌙";
+  /* ==========================================================
+     COMPAT SHIM — 旧 Blender トークン → Obsidian トークン。
+     既存 4,300 行の var() 参照を書き換えずに配色だけ移行するための層。
+     Phase 3 で触ったセクションから順に Obsidian 名へ直し、この行を消す。
+     ========================================================== */
 
-  /* — Blender Panel System (light) — */
-  --color-bg-menubar:       #c8c8c8;
-  --color-bg-panel-header:  #d0d0d0;
-  --color-bg-status:        #bebebe;
-  --color-separator:        #aaaaaa;
-  --color-grip:             #909090;
-  --color-wire:             #cccccc;
+  /* Backgrounds */
+  --color-bg-base:     var(--background-primary);
+  --color-bg-sidebar:  var(--background-secondary);
+  --color-bg-hover:    var(--background-modifier-hover);
+  --color-bg-today:    hsla(var(--color-accent-hsl), 0.15);
+  --color-bg-cell-alt: var(--background-primary-alt);
+  --color-bg-wage:     rgba(var(--color-green-rgb), 0.1);
+  --color-bg-panel:    var(--background-secondary);
+  --color-bg-header:   var(--background-secondary-alt);
+  --color-bg-input:    var(--background-modifier-form-field);
+
+  /* Borders */
+  --color-border-strong: var(--background-modifier-border-hover);
+  --color-border-soft:   var(--background-modifier-border);
+  --color-border-panel:  var(--background-modifier-border);
+
+  /* Text */
+  --color-text-primary:   var(--text-normal);
+  --color-text-secondary: var(--text-muted);
+  --color-text-disabled:  var(--text-faint);
+
+  /* Accent — 旧 --color-accent は Obsidian の同名トークンに自然に統合される
+     ので shim しない（役割が同じ＝選択色）。 */
+  --color-accent-hover:  var(--interactive-accent-hover);
+  --color-accent-subtle: hsla(var(--color-accent-hsl), 0.15);
+  --color-accent-orange:        var(--color-orange);
+  --color-accent-orange-subtle: rgba(var(--color-orange-rgb), 0.15);
+
+  /* Positive / danger */
+  --color-positive:        var(--color-green);
+  --color-positive-bg:     rgba(var(--color-green-rgb), 0.1);
+  --color-positive-border: rgba(var(--color-green-rgb), 0.3);
+  --color-danger:          var(--color-red);
+  --color-danger-subtle:   rgba(var(--color-red-rgb), 0.1);
+
+  /* Weekend */
+  --color-sun: var(--color-red);
+  --color-sat: var(--color-blue);
+
+  /* Overlay / shadows / scrollbar */
+  --color-overlay:   var(--background-modifier-cover);
+  --shadow-sm:       var(--shadow-s);
+  --shadow-md:       var(--shadow-l);
+  --color-scrollbar: var(--scrollbar-thumb-bg);
+
+  /* Radii */
+  --radius-sm: var(--radius-s);
+  --radius-md: var(--input-radius);
+  --radius-lg: var(--radius-m);
+
+  /* Blender パネル系（Phase 3 で DOM ごと消える） */
+  --color-bg-menubar:      var(--background-secondary);
+  --color-bg-panel-header: var(--background-secondary);
+  --color-bg-status:       var(--status-bar-background);
+  --color-separator:       var(--divider-color);
+  --color-grip:            var(--text-faint);
+  --color-wire:            var(--background-modifier-border);
+
+  /* Workspace tabs */
   --color-bg-workspace-tab:        transparent;
-  --color-bg-workspace-tab-hover:  rgba(0,0,0,0.06);
-  --color-bg-workspace-tab-active: #ffffff;
+  --color-bg-workspace-tab-hover:  var(--background-modifier-hover);
+  --color-bg-workspace-tab-active: var(--tab-background-active);
   --color-workspace-tab-border:    transparent;
-  --color-btn:        #d8d8d8;
-  --color-btn-hover:  #e4e4e4;
-  --color-btn-active: #c4c4c4;
-  --color-btn-border: rgba(0,0,0,0.12);
+
+  /* Buttons */
+  --color-btn:        var(--interactive-normal);
+  --color-btn-hover:  var(--interactive-hover);
+  --color-btn-active: var(--background-modifier-border-hover);
+  --color-btn-border: var(--background-modifier-border);
+
+  /* Panel header height */
+  --panel-header-h: var(--header-height);
+
+  /* ★ 従来 CSS が参照していたのに未定義だった3つ。
+     ここで初めて定義され、目標パネル (.goal-*) の枠線と文字色が効くようになる。 */
+  --color-text:    var(--text-normal);
+  --color-border:  var(--background-modifier-border);
+  --color-bg-card: var(--background-primary-alt);
+
+  /* テーマ切替アイコン（Phase 2 で Lucide に置換して削除予定） */
+  --icon-theme: "☀️";
+}
+
+body.theme-light {
+  --icon-theme: "🌙";
 }
 
 /* ============================================================
@@ -174,8 +365,8 @@ html { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
 body {
   background-color: var(--color-bg-base);
   color: var(--color-text-primary);
-  font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', YuGothic, 'Meiryo', 'Noto Sans JP', 'Segoe UI', sans-serif;
-  font-size: 13px;
+  font-family: var(--font-interface);
+  font-size: var(--font-ui-small);
   line-height: 1.45;
   min-height: 100vh;
   transition: background-color 0.25s, color 0.25s;
@@ -190,8 +381,9 @@ input  { font-family: inherit; }
 ::-webkit-scrollbar-thumb       { background: var(--color-scrollbar); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--color-text-secondary); }
 
-/* Firefox */
-* { scrollbar-width: thin; scrollbar-color: var(--color-scrollbar) transparent; }
+/* Firefox — `*` は html にも当たるが、シムは body にしかないので html 上では
+   --color-scrollbar が未解決になる。body 配下にスコープする。 */
+body, body * { scrollbar-width: thin; scrollbar-color: var(--color-scrollbar) transparent; }
 
 /* ============================================================
    APP SHELL (Blender-style full-viewport layout)
@@ -407,7 +599,7 @@ input  { font-family: inherit; }
 .status-item {
   font-size: 10px;
   color: var(--color-text-secondary);
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-monospace);
   white-space: nowrap;
 }
 
@@ -1224,7 +1416,7 @@ input  { font-family: inherit; }
 .event-pill[draggable="true"] { cursor: grab; }
 .event-pill.is-dragging       { opacity: 0.35; pointer-events: none; }
 
-.event-pill-time { font-family: 'JetBrains Mono', monospace; font-size: 10px; opacity: 0.82; flex-shrink: 0; }
+.event-pill-time { font-family: var(--font-monospace); font-size: 10px; opacity: 0.82; flex-shrink: 0; }
 .event-pill-dot  { width: 5px; height: 5px; border-radius: 50%; background-color: rgba(255,255,255,0.6); flex-shrink: 0; }
 .event-pill-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
@@ -1272,7 +1464,7 @@ input  { font-family: inherit; }
 .timer-presets button:hover { background: var(--color-bg-hover); }
 .timer-phase { text-align: center; font-size: 12px; font-weight: 600; color: var(--color-accent); min-height: 16px; }
 .timer-display {
-  text-align: center; font-family: 'JetBrains Mono', monospace;
+  text-align: center; font-family: var(--font-monospace);
   font-size: 46px; font-weight: 600; letter-spacing: 1px;
   color: var(--color-text-primary); margin: 4px 0 14px; font-variant-numeric: tabular-nums;
 }
@@ -1474,7 +1666,7 @@ input  { font-family: inherit; }
 }
 
 /* shift-specific pay display in list */
-.ev-shift-time   { font-family: 'JetBrains Mono', monospace; }
+.ev-shift-time   { font-family: var(--font-monospace); }
 .ev-shift-pay    { font-weight: 700; color: var(--color-positive); }
 
 .ev-delete-btn {
@@ -1663,7 +1855,7 @@ input  { font-family: inherit; }
   font-size: 12px;
   color: var(--color-text-primary);
   font-variant-numeric: tabular-nums;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-monospace);
 }
 
 .wage-preview-divider { height: 1px; background-color: var(--color-positive-border); margin: 6px 0; }
@@ -1881,7 +2073,7 @@ input  { font-family: inherit; }
   color: var(--color-text-primary);
   padding: 4px 8px;
   font-size: 12px;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-monospace);
   outline: none;
   transition: border-color 0.12s;
   -moz-appearance: textfield;
@@ -2051,7 +2243,7 @@ input  { font-family: inherit; }
   color: var(--color-text-primary);
   padding: 3px 6px;
   font-size: 11px;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-monospace);
   outline: none;
   transition: border-color 0.12s;
 }
@@ -2323,7 +2515,7 @@ input  { font-family: inherit; }
   color: var(--color-text-primary);
   padding: 3px 6px;
   font-size: 11px;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-monospace);
   outline: none;
   transition: border-color 0.12s;
 }
@@ -2688,7 +2880,7 @@ input  { font-family: inherit; }
   right: 8px;
   transform: translateY(-50%);
   font-size: 10px;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-monospace);
   color: var(--color-text-disabled);
   white-space: nowrap;
   user-select: none;
@@ -2744,7 +2936,7 @@ input  { font-family: inherit; }
 
 .dv-block-time {
   font-size: 9.5px;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-monospace);
   color: rgba(255,255,255,0.8);
   flex-shrink: 0;
   line-height: 1.3;
@@ -3664,7 +3856,7 @@ input  { font-family: inherit; }
   background: var(--color-danger-subtle);
   border-color: #f5c6c6;
 }
-[data-theme="dark"] .budget-summary-card.is-expense {
+body.theme-dark .budget-summary-card.is-expense {
   border-color: #3a2020;
 }
 .budget-summary-card.is-balance {
@@ -3689,7 +3881,7 @@ input  { font-family: inherit; }
   font-size: 16px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-monospace);
   line-height: 1.3;
 }
 .budget-summary-card.is-income .budget-summary-value  { color: var(--color-positive); }
@@ -3741,7 +3933,7 @@ input  { font-family: inherit; }
 }
 
 .budget-cat-amount {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-monospace);
   font-variant-numeric: tabular-nums;
   font-weight: 600;
   color: var(--color-text-primary);
@@ -3862,7 +4054,7 @@ input  { font-family: inherit; }
   font-size: 11px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-monospace);
 }
 .budget-date-total.is-pos { color: var(--color-positive); }
 .budget-date-total.is-neg { color: var(--color-danger); }
@@ -3918,7 +4110,7 @@ input  { font-family: inherit; }
   font-size: 13px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-monospace);
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -3987,7 +4179,7 @@ input  { font-family: inherit; }
 .budget-cat-select  { width: 100px; flex-shrink: 0; }
 .budget-amount-input {
   width: 100px; flex: 1; min-width: 80px;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-monospace);
 }
 .budget-date-input  { width: 120px; flex-shrink: 0; }
 .budget-memo-input  { flex: 1; min-width: 80px; }
@@ -4065,7 +4257,7 @@ input  { font-family: inherit; }
   font-weight: 700;
   color: var(--color-accent-orange);
   font-variant-numeric: tabular-nums;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-monospace);
 }
 .budget-overtime-sep {
   color: var(--color-border-strong);
@@ -4281,7 +4473,7 @@ input  { font-family: inherit; }
 }
 .receipt-result-date {
   font-size: 12px;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-monospace);
   color: var(--color-text-secondary);
 }
 
@@ -4358,7 +4550,7 @@ input  { font-family: inherit; }
   color: var(--color-text-primary);
   font-size: 13px;
   font-weight: 600;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-monospace);
   font-variant-numeric: tabular-nums;
   padding: 3px 6px;
   outline: none;
@@ -4402,7 +4594,7 @@ input  { font-family: inherit; }
   font-weight: 700;
   color: var(--color-text-primary);
   font-variant-numeric: tabular-nums;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-monospace);
 }
 
 .receipt-actions {

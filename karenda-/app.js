@@ -115,7 +115,7 @@ let selectedCatId  = null;
 let editingCats    = [];
 let colorTargetIdx = null;
 let _colorMode     = 'calendar'; // 'calendar' | 'budget_exp' | 'budget_inc'
-let isDark         = loadLocalJSON('cal_dark') ?? false;
+let isDark         = loadLocalJSON('cal_dark') ?? true;   // Obsidian の既定はダーク
 let activeTab      = 'event';
 let currentUser    = null;
 let currentView    = 'month';  // 'month' | 'day'
@@ -980,11 +980,23 @@ async function moveEventToDate(dbId, srcKey, destKey) {
   await updateEventDateInSupabase(dbId, destKey);
 }
 
+// Obsidian はテーマを <body> の theme-dark / theme-light クラスで切り替える。
+// index.html の <body class="theme-dark"> が初期ペイントのちらつきを防ぐので、
+// ここと既定値 (isDark) が食い違うと一瞬反転して見える点に注意。
 function applyTheme(dark) {
-  document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+  document.body.classList.toggle('theme-dark', dark);
+  document.body.classList.toggle('theme-light', !dark);
 }
 function toggleTheme() {
   isDark = !isDark; applyTheme(isDark); saveLocalJSON('cal_dark', isDark);
+}
+
+// Obsidian はプラットフォームも <body> のクラスで示す（is-mobile / is-phone）。
+// 幅の判定は isNarrowScreen() と同じ 720px に揃える。
+function applyPlatformClass() {
+  const narrow = isNarrowScreen();
+  document.body.classList.toggle('is-mobile', narrow);
+  document.body.classList.toggle('is-phone', narrow);
 }
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
@@ -2946,6 +2958,11 @@ function renderAll(){
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 
 applyTheme(isDark);
+applyPlatformClass();
+// MediaQueryList は参照を保持する。捨てると実装によっては GC され、
+// change リスナーが黙って死ぬ。
+const _narrowMQL = window.matchMedia('(max-width: 720px)');
+_narrowMQL.addEventListener('change', applyPlatformClass);
 // Auth state change will trigger showApp() → loadFromSupabase() → renderAll()
 
 // ── Mobile sidebar hamburger toggle ──────────────────────────────────────────

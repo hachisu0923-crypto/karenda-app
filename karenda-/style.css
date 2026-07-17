@@ -109,6 +109,8 @@
   --dialog-width: 560px;
   --dialog-max-width: 80vw;
   --dialog-max-height: 85vh;
+  --modal-max-width: 1100px;
+  --modal-max-height: 1000px;
   --modal-border-width: var(--border-width);
   --cursor: default;
 
@@ -290,6 +292,10 @@ body {
   --tab-outline-color: var(--divider-color);
   --modal-background:   var(--background-primary);
   --modal-border-color: var(--background-modifier-border-focus);
+  /* Obsidian: 設定モーダルは本体より一段暗い地に、縦タブ側がさらに別地。
+     .is-mobile では両方 --background-primary に寄る（実測）。 */
+  --settings-background:       var(--background-secondary);
+  --modal-sidebar-background:  var(--background-secondary);
   --nav-item-color:            var(--text-muted);
   --nav-item-color-hover:      var(--text-normal);
   --nav-item-background-hover: var(--background-modifier-hover);
@@ -424,6 +430,131 @@ body {
 
 /* ボタン等でアイコンとラベルを並べるときの既定の間隔 */
 .svg-icon + span { margin-left: var(--size-4-1); }
+
+/* ============================================================
+   SETTINGS MODAL — Obsidian の .modal.mod-settings
+   左に縦タブ、右にペイン。値は Obsidian 本体の app.css からの実測。
+   ============================================================ */
+.modal.mod-settings {
+  background-color: var(--settings-background);
+  max-width: var(--modal-max-width);
+  max-height: var(--modal-max-height);
+  width: 90vw;
+  height: 70vh;
+  padding: 0;
+  overflow: hidden;
+}
+.vertical-tabs-container {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.modal.mod-settings .vertical-tab-header {
+  flex: 0 0 25%;
+  min-width: 180px;
+  max-width: 250px;
+  overflow: auto;
+  border-inline-end: var(--border-width) solid var(--divider-color);
+  padding: var(--size-4-3);
+  background-color: var(--modal-sidebar-background);
+}
+.vertical-tab-header-group-title {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-faint);
+  font-weight: var(--font-semibold);
+  padding: var(--size-4-2);
+  user-select: none;
+}
+.vertical-tab-nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-2);
+  padding: var(--size-4-1) var(--size-4-2);
+  user-select: none;
+  cursor: var(--cursor);
+  font-size: calc(var(--font-ui-small) + 1px);
+  border-radius: var(--radius-s);
+  color: var(--text-muted);
+  --icon-size: var(--icon-xs);
+}
+.vertical-tab-nav-item:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.vertical-tab-nav-item.is-active {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.vertical-tab-content-container {
+  overflow: hidden;
+  flex-grow: 1;
+  min-width: 0;
+}
+.vertical-tab-content {
+  background-color: var(--background-primary);
+  overflow-y: auto;
+  height: 100%;
+  padding: var(--size-4-4) var(--size-4-6) var(--size-4-8);
+}
+.setting-item-heading .setting-item-name {
+  font-size: var(--font-ui-large);
+  font-weight: var(--font-semibold);
+}
+.setting-item-heading { border-top: none; padding-top: 0; }
+/* 各ペインの保存/キャンセル */
+.setting-pane-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--size-4-2);
+  padding-top: var(--size-4-4);
+  margin-top: var(--size-4-3);
+  border-top: var(--border-width) solid var(--background-modifier-border);
+}
+.setting-pane-footer .btn-primary,
+.setting-pane-footer .btn-secondary { width: auto; padding: 7px 18px; }
+/* 設定モーダルの閉じるボタンは右上に浮かせる */
+.modal.mod-settings > .modal-close-button {
+  position: absolute;
+  top: var(--size-4-2);
+  right: var(--size-4-2);
+  z-index: 2;
+}
+
+/* モバイル: 縦タブが潰れるので上に横並びで載せる（Obsidian モバイルも
+   設定は縦タブを畳んで階層ナビにする）。 */
+/* モバイルの .overlay は下寄せ（ボトムシート）で、.modal は max-height:92vh に
+   絞られる。設定モーダルだけは全画面にしたいので、その両方を打ち消す。
+   （92vh に負けたまま flex-end で下寄せされると、上に 8vh の隙間が空いて
+   モーダルが画面からはみ出して見える。） */
+body.is-phone .mod-settings-container {
+  padding-top: 0;
+  align-items: stretch;
+}
+body.is-phone .modal.mod-settings {
+  width: 100vw;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;      /* ← .modal の 92vh を打ち消す */
+  border-radius: 0;
+  border: none;
+  animation: none;       /* ボトムシートのスライドアップは全画面には要らない */
+  background-color: var(--background-primary);
+}
+body.is-phone .vertical-tabs-container { flex-direction: column; }
+body.is-phone .modal.mod-settings .vertical-tab-header {
+  flex: 0 0 auto;
+  max-width: none;
+  display: flex;
+  gap: var(--size-4-1);
+  overflow-x: auto;
+  border-inline-end: none;
+  border-bottom: var(--border-width) solid var(--divider-color);
+  padding: var(--size-4-2);
+}
+body.is-phone .vertical-tab-header-group-title { display: none; }
+body.is-phone .vertical-tab-nav-item { flex: 0 0 auto; white-space: nowrap; }
+body.is-phone .vertical-tab-content { padding: var(--size-4-3); }
 
 /* ============================================================
    SETTING ITEMS — Obsidian の設定行（name / description / control）

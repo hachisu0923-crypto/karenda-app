@@ -138,6 +138,9 @@
     <button class="clickable-icon" id="js-theme-toggle" aria-label="テーマ切替">
       <svg class="svg-icon"><use href="#lucide-moon"/></svg>
     </button>
+    <button class="clickable-icon" id="js-ribbon-settings" aria-label="設定">
+      <svg class="svg-icon"><use href="#lucide-settings"/></svg>
+    </button>
   </div>
 </div>
 
@@ -231,10 +234,13 @@
       <button class="btn-notif" id="js-notif-btn"><svg class="svg-icon"><use href="#lucide-bell"/></svg><span id="js-notif-label">通知を有効にする</span></button>
     </div>
 
-    <!-- User info + logout -->
+    <!-- User info + logout。モバイルはリボンが畳まれるので、設定の入口はここにも要る。 -->
     <div class="sidebar-user-area">
       <div class="user-row">
         <span class="user-email" id="js-user-email"></span>
+        <button class="clickable-icon" id="js-sidebar-settings" aria-label="設定" title="設定">
+          <svg class="svg-icon"><use href="#lucide-settings"/></svg>
+        </button>
         <button class="btn-logout" id="js-logout">ログアウト</button>
       </div>
     </div>
@@ -757,66 +763,10 @@
 </div>
 
 <!-- ═══════════ JCB INGEST SETTINGS MODAL ═══════════ -->
-<div class="modal-container overlay" id="js-jcb-overlay">
-  <div class="modal-bg"></div>
-  <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="js-jcb-title">
-    <div class="modal-header">
-      <div>
-        <div class="modal-header-title" id="js-jcb-title"><svg class="svg-icon"><use href="#lucide-credit-card"/></svg><span>JCBメール自動取込</span></div>
-        <div class="modal-header-sub">利用通知メールの金額を家計簿へ自動登録</div>
-      </div>
-      <button class="modal-close-button modal-close-btn" id="js-jcb-close" aria-label="閉じる"><svg class="svg-icon"><use href="#lucide-x"/></svg></button>
-    </div>
-    <div class="modal-body">
-      <p style="font-size:13px;line-height:1.8;margin:0 0 12px;">
-        Gmail に届く JCB のご利用通知メールから金額を自動で家計簿に取り込めます。
-        設定には下の 2 つの値を使います（詳しい手順は <strong>SETUP_JCB_INGEST.md</strong>）。
-      </p>
-      <div class="form-row">
-        <label class="form-label">あなたのユーザーID（INGEST_USER_ID にコピー）</label>
-        <input class="form-input" id="js-jcb-userid" type="text" readonly />
-      </div>
-      <div class="form-row">
-        <label class="form-label">取込エンドポイント URL</label>
-        <input class="form-input" id="js-jcb-url" type="text" readonly
-               value="https://oungvayvmxkszsokxwxd.supabase.co/functions/v1/ingest-jcb" />
-      </div>
-      <p style="font-size:12px;line-height:1.7;margin:10px 0 0;opacity:.75;">
-        手順の概要：① SQL を実行 → ② Edge Function <code>ingest-jcb</code> をデプロイ →
-        ③ Secrets（INGEST_SECRET / 上記 INGEST_USER_ID）を登録 →
-        ④ Google Apps Script を設定して 15 分ごとに実行。
-      </p>
-    </div>
-    <div class="modal-footer">
-      <button class="btn-primary" style="width:auto;padding:7px 18px;" id="js-jcb-ok">閉じる</button>
-    </div>
-  </div>
-</div>
+<!-- js-jcb-overlay -> 設定モーダルのペインへ移設 -->
 
 <!-- ═══════════ CATEGORY EDITOR MODAL ═══════════ -->
-<div class="modal-container overlay" id="js-cat-overlay">
-  <div class="modal-bg"></div>
-  <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="js-cat-modal-title">
-    <div class="modal-header">
-      <div>
-        <div class="modal-header-title" id="js-cat-modal-title">カテゴリの管理</div>
-        <div class="modal-header-sub">バイトにはシフトテンプレートと時給を設定できます</div>
-      </div>
-      <button class="modal-close-button modal-close-btn" id="js-cat-modal-close" aria-label="閉じる"><svg class="svg-icon"><use href="#lucide-x"/></svg></button>
-    </div>
-    <div class="modal-body">
-      <div id="js-cat-editor-list"></div>
-      <button class="add-cat-row" id="js-add-cat-row">
-        <span style="font-size:16px;line-height:1">+</span>
-        <span>カテゴリを追加</span>
-      </button>
-    </div>
-    <div class="modal-footer">
-      <button class="btn-secondary" id="js-cat-cancel-btn">キャンセル</button>
-      <button class="btn-primary" style="width:auto;padding:7px 18px;" id="js-cat-save-btn">保存する</button>
-    </div>
-  </div>
-</div>
+<!-- js-cat-overlay -> 設定モーダルのペインへ移設 -->
 
 <!-- ═══════════ COLOR PICKER POPUP ═══════════ -->
 <div class="color-popup" id="js-color-popup">
@@ -829,33 +779,7 @@
 </div>
 
 <!-- ═══════════ BUDGET CATEGORY EDITOR MODAL ═══════════ -->
-<div class="modal-container overlay" id="js-budget-cat-overlay">
-  <div class="modal-bg"></div>
-  <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="js-budget-cat-modal-title">
-    <div class="modal-header">
-      <div>
-        <div class="modal-header-title" id="js-budget-cat-modal-title">家計簿カテゴリの管理</div>
-        <div class="modal-header-sub">支出・収入のカテゴリを自由に編集できます</div>
-      </div>
-      <button class="modal-close-button modal-close-btn" id="js-budget-cat-modal-close" aria-label="閉じる"><svg class="svg-icon"><use href="#lucide-x"/></svg></button>
-    </div>
-    <div class="modal-body">
-      <div class="budget-cat-tab-bar">
-        <button class="budget-cat-tab is-active" data-bcat-tab="expense">支出カテゴリ</button>
-        <button class="budget-cat-tab" data-bcat-tab="income">収入カテゴリ</button>
-      </div>
-      <div id="js-budget-cat-editor-list"></div>
-      <button class="add-cat-row" id="js-add-budget-cat-row">
-        <span style="font-size:16px;line-height:1">+</span>
-        <span>カテゴリを追加</span>
-      </button>
-    </div>
-    <div class="modal-footer">
-      <button class="btn-secondary" id="js-budget-cat-cancel-btn">キャンセル</button>
-      <button class="btn-primary" style="width:auto;padding:7px 18px;" id="js-budget-cat-save-btn">保存する</button>
-    </div>
-  </div>
-</div>
+<!-- js-budget-cat-overlay -> 設定モーダルのペインへ移設 -->
 
 <!-- ═══════════ RECEIPT SCAN MODAL ═══════════ -->
 <div class="modal-container overlay" id="js-receipt-overlay">
@@ -1047,61 +971,156 @@
      showDirectoryPicker が無い環境（iOS Safari / Firefox）では、app.js が
      この導線ごと隠す。iOS の vault は iCloud 上にあり「ローカルフォルダを
      選ぶ」概念自体が無いため。 -->
-<div class="modal-container overlay" id="js-vault-overlay">
-  <div class="modal-bg"></div>
-  <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="js-vault-title">
-    <div class="modal-header">
-      <div>
-        <div class="modal-header-title" id="js-vault-title"><svg class="svg-icon"><use href="#lucide-list-tree"/></svg><span>Obsidian Vault</span></div>
-        <div class="modal-header-sub">予定を Markdown ノートとして書き出し／読み込み</div>
-      </div>
-      <button class="modal-close-button modal-close-btn" id="js-vault-close" aria-label="閉じる"><svg class="svg-icon"><use href="#lucide-x"/></svg></button>
-    </div>
-    <div class="modal-body">
-      <div class="setting-item">
-        <div class="setting-item-info">
-          <div class="setting-item-name">Vault フォルダ</div>
-          <div class="setting-item-description" id="js-vault-path">未選択</div>
-        </div>
-        <div class="setting-item-control">
-          <button class="btn-secondary" id="js-vault-pick">選択</button>
-        </div>
-      </div>
-
-      <div class="setting-item">
-        <div class="setting-item-info">
-          <div class="setting-item-name">書き出し</div>
-          <div class="setting-item-description">
-            表示中の月の予定を <code>karenda/daily/YYYY-MM-DD.md</code> に、
-            家計簿・タスク・目標を <code>karenda/</code> 配下の個別ノートに書き出します。
-            同名ファイルは上書きされます。
-          </div>
-        </div>
-        <div class="setting-item-control">
-          <button class="btn-primary mod-cta" id="js-vault-export" style="width:auto;padding:6px 14px">書き出す</button>
-        </div>
-      </div>
-
-      <div class="setting-item">
-        <div class="setting-item-info">
-          <div class="setting-item-name">読み込み</div>
-          <div class="setting-item-description">
-            <code>karenda/daily/</code> のデイリーノートを読み、表示中の月の予定を
-            置き換えます。Obsidian 側での手編集を取り込むときに使います。
-          </div>
-        </div>
-        <div class="setting-item-control">
-          <button class="btn-secondary" id="js-vault-import">読み込む</button>
-        </div>
-      </div>
-
-      <div id="js-vault-log" class="vault-log" aria-live="polite"></div>
-    </div>
-  </div>
-</div>
+<!-- js-vault-overlay -> 設定モーダルのペインへ移設 -->
 
 <!-- ═══════════ MOBILE: FAB (＋ 予定追加) ═══════════ -->
 <button class="fab" id="js-fab-add" type="button" aria-label="予定を追加">＋</button>
+
+<!-- ═══════════ SETTINGS (Obsidian: .modal.mod-settings) ═══════════
+     Obsidian は設定を1枚のモーダルに集約し、左の縦タブで切り替える。
+     カテゴリ / 家計簿カテゴリ / JCB / Vault の4つは「グローバル設定」なので
+     ここへ。日付やイベントを引数に取る作業系モーダル（予定の追加・編集・
+     タイマー・レシート等）は性質が違うので統合しない。 -->
+<div class="modal-container overlay mod-settings-container" id="js-settings-overlay">
+  <div class="modal-bg"></div>
+  <div class="modal mod-settings" role="dialog" aria-modal="true" aria-labelledby="js-settings-title">
+    <div class="modal-close-button modal-close-btn" id="js-settings-close" role="button" tabindex="0" aria-label="閉じる">
+      <svg class="svg-icon"><use href="#lucide-x"/></svg>
+    </div>
+    <div class="modal-content vertical-tabs-container">
+      <div class="vertical-tab-header">
+        <div class="vertical-tab-header-group-title" id="js-settings-title">設定</div>
+        <div class="vertical-tab-nav-item is-active" data-settings-tab="cat" role="tab" tabindex="0">
+          <svg class="svg-icon"><use href="#lucide-tag"/></svg><span>カテゴリ</span>
+        </div>
+        <div class="vertical-tab-nav-item" data-settings-tab="bcat" role="tab" tabindex="0">
+          <svg class="svg-icon"><use href="#lucide-wallet"/></svg><span>家計簿カテゴリ</span>
+        </div>
+        <div class="vertical-tab-nav-item" data-settings-tab="jcb" role="tab" tabindex="0">
+          <svg class="svg-icon"><use href="#lucide-credit-card"/></svg><span>JCB連携</span>
+        </div>
+        <div class="vertical-tab-nav-item" data-settings-tab="vault" role="tab" tabindex="0">
+          <svg class="svg-icon"><use href="#lucide-list-tree"/></svg><span>Obsidian Vault</span>
+        </div>
+      </div>
+      <div class="vertical-tab-content-container">
+      <div class="vertical-tab-content" data-settings-tab="cat" style="display:none">
+        <div class="setting-item setting-item-heading">
+          <div class="setting-item-info">
+            <div class="setting-item-name">カテゴリ</div>
+            <div class="setting-item-description">バイトにはシフトテンプレートと時給を設定できます</div>
+          </div>
+        </div>
+        <div id="js-cat-editor-list"></div>
+        <button class="add-cat-row" id="js-add-cat-row">
+          <span style="font-size:16px;line-height:1">+</span>
+          <span>カテゴリを追加</span>
+        </button>
+        <div class="setting-pane-footer">
+          <button class="btn-secondary" id="js-cat-cancel-btn">キャンセル</button>
+          <button class="btn-primary" style="width:auto;padding:7px 18px;" id="js-cat-save-btn">保存する</button>
+        </div>
+      </div>
+      <div class="vertical-tab-content" data-settings-tab="bcat" style="display:none">
+        <div class="setting-item setting-item-heading">
+          <div class="setting-item-info">
+            <div class="setting-item-name">家計簿カテゴリ</div>
+            <div class="setting-item-description">支出・収入のカテゴリを自由に編集できます</div>
+          </div>
+        </div>
+        <div class="budget-cat-tab-bar">
+          <button class="budget-cat-tab is-active" data-bcat-tab="expense">支出カテゴリ</button>
+          <button class="budget-cat-tab" data-bcat-tab="income">収入カテゴリ</button>
+        </div>
+        <div id="js-budget-cat-editor-list"></div>
+        <button class="add-cat-row" id="js-add-budget-cat-row">
+          <span style="font-size:16px;line-height:1">+</span>
+          <span>カテゴリを追加</span>
+        </button>
+        <div class="setting-pane-footer">
+          <button class="btn-secondary" id="js-budget-cat-cancel-btn">キャンセル</button>
+          <button class="btn-primary" style="width:auto;padding:7px 18px;" id="js-budget-cat-save-btn">保存する</button>
+        </div>
+      </div>
+      <div class="vertical-tab-content" data-settings-tab="jcb" style="display:none">
+        <div class="setting-item setting-item-heading">
+          <div class="setting-item-info">
+            <div class="setting-item-name">JCBメール自動取込</div>
+            <div class="setting-item-description">利用通知メールの金額を家計簿へ自動登録</div>
+          </div>
+        </div>
+        <p style="font-size:13px;line-height:1.8;margin:0 0 12px;">
+          Gmail に届く JCB のご利用通知メールから金額を自動で家計簿に取り込めます。
+          設定には下の 2 つの値を使います（詳しい手順は <strong>SETUP_JCB_INGEST.md</strong>）。
+        </p>
+        <div class="form-row">
+          <label class="form-label">あなたのユーザーID（INGEST_USER_ID にコピー）</label>
+          <input class="form-input" id="js-jcb-userid" type="text" readonly />
+        </div>
+        <div class="form-row">
+          <label class="form-label">取込エンドポイント URL</label>
+          <input class="form-input" id="js-jcb-url" type="text" readonly
+                 value="https://oungvayvmxkszsokxwxd.supabase.co/functions/v1/ingest-jcb" />
+        </div>
+        <p style="font-size:12px;line-height:1.7;margin:10px 0 0;opacity:.75;">
+          手順の概要：① SQL を実行 → ② Edge Function <code>ingest-jcb</code> をデプロイ →
+          ③ Secrets（INGEST_SECRET / 上記 INGEST_USER_ID）を登録 →
+          ④ Google Apps Script を設定して 15 分ごとに実行。
+        </p>
+        <div class="setting-pane-footer">
+          <button class="btn-primary" style="width:auto;padding:7px 18px;" id="js-jcb-ok">閉じる</button>
+        </div>
+      </div>
+      <div class="vertical-tab-content" data-settings-tab="vault" style="display:none">
+        <div class="setting-item setting-item-heading">
+          <div class="setting-item-info">
+            <div class="setting-item-name">Obsidian Vault</div>
+            <div class="setting-item-description">予定を Markdown ノートとして書き出し／読み込み</div>
+          </div>
+        </div>
+        <div class="setting-item">
+          <div class="setting-item-info">
+            <div class="setting-item-name">Vault フォルダ</div>
+            <div class="setting-item-description" id="js-vault-path">未選択</div>
+          </div>
+          <div class="setting-item-control">
+            <button class="btn-secondary" id="js-vault-pick">選択</button>
+          </div>
+        </div>
+
+        <div class="setting-item">
+          <div class="setting-item-info">
+            <div class="setting-item-name">書き出し</div>
+            <div class="setting-item-description">
+              表示中の月の予定を <code>karenda/daily/YYYY-MM-DD.md</code> に、
+              家計簿・タスク・目標を <code>karenda/</code> 配下の個別ノートに書き出します。
+              同名ファイルは上書きされます。
+            </div>
+          </div>
+          <div class="setting-item-control">
+            <button class="btn-primary mod-cta" id="js-vault-export" style="width:auto;padding:6px 14px">書き出す</button>
+          </div>
+        </div>
+
+        <div class="setting-item">
+          <div class="setting-item-info">
+            <div class="setting-item-name">読み込み</div>
+            <div class="setting-item-description">
+              <code>karenda/daily/</code> のデイリーノートを読み、表示中の月の予定を
+              置き換えます。Obsidian 側での手編集を取り込むときに使います。
+            </div>
+          </div>
+          <div class="setting-item-control">
+            <button class="btn-secondary" id="js-vault-import">読み込む</button>
+          </div>
+        </div>
+
+        <div id="js-vault-log" class="vault-log" aria-live="polite"></div>
+      </div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- ═══════════ MOBILE TOOLBAR (Obsidian: .mobile-toolbar) ═══════════
      Obsidian モバイルのツールバーはアイコンのみ。6ビュー＋タイマーの7個で

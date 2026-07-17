@@ -2462,10 +2462,37 @@ document.getElementById('js-overtime-history-overlay').addEventListener('click',
 
 // ── Category editor ───────────────────────────────────────────────────────────
 
+// ── Settings modal (Obsidian: .modal.mod-settings) ───────────────────────────
+// カテゴリ / 家計簿カテゴリ / JCB / Vault は独立モーダルから縦タブのペインへ
+// 集約された。中身の DOM と id はそのままなので、各ペインの JS は無変更。
+function openSettings(tab) {
+  document.querySelectorAll('#js-settings-overlay .vertical-tab-nav-item').forEach(n =>
+    n.classList.toggle('is-active', n.dataset.settingsTab === tab));
+  document.querySelectorAll('#js-settings-overlay .vertical-tab-content').forEach(p =>
+    p.style.display = p.dataset.settingsTab === tab ? '' : 'none');
+  openOverlay('js-settings-overlay');
+}
+function closeSettings() {
+  closeOverlay('js-settings-overlay');
+  closeColorPopup();
+}
+
+document.querySelectorAll('#js-settings-overlay .vertical-tab-nav-item').forEach(nav => {
+  const go = () => openSettings(nav.dataset.settingsTab);
+  nav.addEventListener('click', go);
+  nav.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); }
+  });
+});
+document.getElementById('js-settings-close')?.addEventListener('click', closeSettings);
+document.addEventListener('click', e => {
+  if (_isBackdropClick(e, 'js-settings-overlay')) closeSettings();
+});
+
 function openCatEditor() {
   editingCats=deepClone(categories);
   renderCatEditorList();
-  openOverlay('js-cat-overlay');
+  openSettings('cat');
 }
 
 function renderCatEditorList() {
@@ -2613,17 +2640,12 @@ document.getElementById('js-cat-save-btn').addEventListener('click',async()=>{
   await Promise.all(allToDelete.map(ev=>deleteEventFromSupabase(ev)));
   if (!getCat(selectedCatId)) selectedCatId=normalCats()[0]?.id??categories[0]?.id;
   await saveCategoriesToSupabase();
-  closeOverlay('js-cat-overlay');
-  closeColorPopup();
+  closeSettings();
   renderAll();
 });
 
-['js-cat-cancel-btn','js-cat-modal-close'].forEach(id=>{
-  document.getElementById(id).addEventListener('click',()=>{closeOverlay('js-cat-overlay');closeColorPopup();});
-});
-document.getElementById('js-cat-overlay').addEventListener('click',e=>{
-  if (e.target===document.getElementById('js-cat-overlay')){closeOverlay('js-cat-overlay');closeColorPopup();}
-});
+// js-cat-modal-close は設定モーダルへの集約で消えた（ヘッダは1つに統合）。
+document.getElementById('js-cat-cancel-btn')?.addEventListener('click', closeSettings);
 
 // ── Color picker ──────────────────────────────────────────────────────────────
 
@@ -2821,7 +2843,7 @@ function openBudgetCatEditor() {
   renderBudgetCatEditorList();
   document.querySelectorAll('.budget-cat-tab').forEach(b=>
     b.classList.toggle('is-active', b.dataset.bcatTab===_budgetCatTab));
-  openOverlay('js-budget-cat-overlay');
+  openSettings('bcat');
 }
 
 function renderBudgetCatEditorList() {
@@ -2883,20 +2905,17 @@ document.getElementById('js-budget-cat-save-btn').addEventListener('click',()=>{
   _saveBudgetCats();
   _updateBudgetCatOptions();
   if (_budgetState) renderBudgetPanel();
-  closeOverlay('js-budget-cat-overlay');
+  closeSettings();
 });
 
-document.getElementById('js-budget-cat-cancel-btn').addEventListener('click',()=>closeOverlay('js-budget-cat-overlay'));
-document.getElementById('js-budget-cat-modal-close').addEventListener('click',()=>closeOverlay('js-budget-cat-overlay'));
-document.getElementById('js-budget-cat-overlay').addEventListener('click',e=>{
-  if (e.target===document.getElementById('js-budget-cat-overlay')) closeOverlay('js-budget-cat-overlay');
-});
+// js-budget-cat-modal-close も同上。?. 無しだったので消し忘れると app.js が止まる。
+document.getElementById('js-budget-cat-cancel-btn')?.addEventListener('click', closeSettings);
 document.getElementById('js-open-budget-cat-editor').addEventListener('click',openBudgetCatEditor);
 
 document.addEventListener('keydown',e=>{
   // Escapeキーはinput内でもモーダルを閉じられるようにする
   if (e.key==='Escape'){
-    closeOverlay('js-day-overlay');closeOverlay('js-cat-overlay');closeOverlay('js-budget-cat-overlay');closeEditModal();closeColorPopup();closeOverlay('js-receipt-overlay');closeOverlay('js-overtime-cashout-overlay');closeOverlay('js-overtime-history-overlay');closeRepeatPicker();closeOverlay('js-ios-guide-overlay');closeOverlay('js-jcb-overlay');
+    closeOverlay('js-day-overlay');closeSettings();closeEditModal();closeOverlay('js-receipt-overlay');closeOverlay('js-overtime-cashout-overlay');closeOverlay('js-overtime-history-overlay');closeRepeatPicker();closeOverlay('js-ios-guide-overlay');
     if (document.activeElement) document.activeElement.blur();
     return;
   }
@@ -3006,6 +3025,10 @@ document.getElementById('js-ribbon-today')?.addEventListener('click', () => {
 document.getElementById('js-ribbon-timer')?.addEventListener('click', () => {
   document.getElementById('js-mbb-timer')?.click();
 });
+// 設定の入口は2つ。モバイルではリボンが畳まれる（body:not(.show-ribbon)）ので、
+// サイドバーのフッターにも歯車が要る。
+document.getElementById('js-ribbon-settings')?.addEventListener('click', () => openSettings('cat'));
+document.getElementById('js-sidebar-settings')?.addEventListener('click', () => openSettings('cat'));
 
 applyTheme(isDark);
 applyPlatformClass();
@@ -5419,13 +5442,10 @@ document.getElementById('js-jcb-btn')?.addEventListener('click', function() {
   var uid = (typeof currentUser !== 'undefined' && currentUser) ? currentUser.id : '';
   var el = document.getElementById('js-jcb-userid');
   if (el) el.value = uid || '(ログインすると表示されます)';
-  openOverlay('js-jcb-overlay');
+  openSettings('jcb');
 });
-document.getElementById('js-jcb-close')?.addEventListener('click', function() { closeOverlay('js-jcb-overlay'); });
-document.getElementById('js-jcb-ok')?.addEventListener('click', function() { closeOverlay('js-jcb-overlay'); });
-document.getElementById('js-jcb-overlay')?.addEventListener('click', function(e) {
-  if (_isBackdropClick(e, 'js-jcb-overlay')) closeOverlay('js-jcb-overlay');
-});
+
+document.getElementById('js-jcb-ok')?.addEventListener('click', closeSettings);
 
 document.getElementById('js-receipt-modal-close').addEventListener('click', function() {
   closeOverlay('js-receipt-overlay');
@@ -5965,13 +5985,9 @@ async function vaultImport() {
   if (ribbonBtn) ribbonBtn.hidden = false;
 
   ribbonBtn?.addEventListener('click', async () => {
-    openOverlay('js-vault-overlay');
+    openSettings('vault');
     const saved = await vaultFs.getSavedVault();
     if (saved) { _vaultHandle = saved; _vaultSetPath(saved.name); }
-  });
-  document.getElementById('js-vault-close')?.addEventListener('click', () => closeOverlay('js-vault-overlay'));
-  document.addEventListener('click', e => {
-    if (_isBackdropClick(e, 'js-vault-overlay')) closeOverlay('js-vault-overlay');
   });
 
   document.getElementById('js-vault-pick')?.addEventListener('click', async () => {

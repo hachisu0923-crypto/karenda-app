@@ -35,6 +35,9 @@ let mainWindow = null;
 let staticServer = null;
 let waitForOAuthCallback = null;   // static-server が提供する one-shot 待受
 let _dragOrigin = null;            // ウィンドウドラッグ移動の基準
+let _idle = false;                 // アイドル（peek）状態か
+let _prevAlwaysOnTop = false;      // アイドル前の最前面固定状態（復元用）
+let _slideTimer = null;            // スライドアニメの setInterval ハンドル（in-flight）
 
 // カレンダー本体の iframe（メインワールド）に注入する「マウス→タッチ変換器」。
 // 左ボタンのドラッグを touchstart/touchmove/touchend に変換し、指スワイプと同じ
@@ -203,6 +206,46 @@ async function createWindow() {
   mainWindow.on('closed', () => { mainWindow = null; });
 }
 
+// ── アイドル（peek）ジオメトリ計算 ───────────────────────────────────────
+// 右下ドック位置と、アイドル/展開の Y を求める。frameless なので getBounds はコンテンツ実px。
+function computeDockGeometry() {
+  const b = mainWindow.getBounds();
+  const wa = screen.getDisplayMatching(b).workArea;   // タスクバー等を除いた作業領域
+  const scale = b.height / STAGE_H;                    // 実px/論理px
+  const topMargin = SHADOW * scale;                    // ボディ上の透明マージン
+  const bodyH = BODY_H * scale;                        // 端末ボディの実高さ
+  const dockX = Math.round(wa.x + wa.width - b.width);                      // idle/展開で共通＝横ブレ無し
+  const idleY = Math.round(wa.y + wa.height - (topMargin + bodyH / 6));     // 上部1/6+上マージンのみ露出
+  const expandedY = Math.round(wa.y + wa.height - b.height);                // 全体を画面内・下端揃え
+  return { dockX, idleY, expandedY };
+}
+
+// ── スライドアニメ（easeOutCubic）。in-flight は必ずキャンセルしてから開始 ──
+// サイズは常に固定で渡す＝setAspectRatio に補正の余地を与えず、x/y だけを動かす。
+function animateBounds(targetX, targetY, done) {
+  if (!mainWindow) return;
+  if (_slideTimer) { clearInterval(_slideTimer); _slideTimer = null; }
+  const start = mainWindow.getBounds();
+  const fromX = start.x, fromY = start.y;
+  const dx = targetX - fromX, dy = targetY - fromY;
+  if (dx === 0 && dy === 0) { if (done) done(); return; }
+  const DURATION = 260, STEP = 16;
+  const t0 = Date.now();
+  const ease = (t) => 1 - Math.pow(1 - t, 3);          // easeOutCubic
+  _slideTimer = setInterval(() => {
+    if (!mainWindow) { clearInterval(_slideTimer); _slideTimer = null; return; }
+    let p = (Date.now() - t0) / DURATION;
+    if (p >= 1) p = 1;
+    const e = ease(p);
+    mainWindow.setBounds({
+      x: Math.round(fromX + dx * e),
+      y: Math.round(fromY + dy * e),
+      width: start.width, height: start.height          // サイズ固定＝アスペクト比不変
+    });
+    if (p >= 1) { clearInterval(_slideTimer); _slideTimer = null; if (done) done(); }
+  }, STEP);
+}
+
 // ── ウィンドウ操作（frameless のため独自に提供）──────────────────────────
 ipcMain.handle('win:minimize', () => { if (mainWindow) mainWindow.minimize(); });
 ipcMain.handle('win:close',    () => { if (mainWindow) mainWindow.close(); });
@@ -212,9 +255,32 @@ ipcMain.handle('win:setAlwaysOnTop', (_e, flag) => {
   return !!flag;
 });
 
+// ── アイドル（peek）モード ──────────────────────────────────────────────
+// enter: 右下へ沈め、上部1/6だけ露出。常に最前面化し、直前のピン状態を控える。
+ipcMain.handle('win:enterIdle', (_e, prevPinned) => {
+  if (!mainWindow || _idle) return false;
+  _idle = true;
+  _prevAlwaysOnTop = (typeof prevPinned === 'boolean')
+    ? prevPinned : mainWindow.isAlwaysOnTop();
+  mainWindow.setAlwaysOnTop(true);
+  const g = computeDockGeometry();
+  animateBounds(g.dockX, g.idleY);
+  return true;
+});
+// exit: 下から上へせり上げて全体表示。最前面固定を元のピン状態へ復元。
+ipcMain.handle('win:exitIdle', () => {
+  if (!mainWindow || !_idle) return false;
+  _idle = false;
+  const g = computeDockGeometry();
+  animateBounds(g.dockX, g.expandedY, () => {
+    if (mainWindow) mainWindow.setAlwaysOnTop(_prevAlwaysOnTop);
+  });
+  return _prevAlwaysOnTop;   // シェルがピンボタン表示を再同期できるよう返す
+});
+
 // ベゼルのドラッグでウィンドウ移動（CSS transform 下でも安定するよう手動実装）
 ipcMain.on('win:dragStart', () => {
-  if (!mainWindow) return;
+  if (!mainWindow || _idle) return;   // アイドル中はドラッグ起点にしない
   const b = mainWindow.getBounds();
   _dragOrigin = { x: b.x, y: b.y };
 });

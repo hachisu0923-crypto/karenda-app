@@ -4698,6 +4698,10 @@ const _BUDGET_EXP_CATS_DEFAULT = [
   { id:'other_exp',  name:'その他', icon:'📦', color:'#888' },
 ];
 
+const _BUDGET_SUBSCRIPTION_CAT = {
+  id: 'subscription', name: 'サブスク・月額', icon: '🔁', color: '#7c3aed'
+};
+
 const _BUDGET_INC_CATS_DEFAULT = [
   { id:'salary',     name:'給料',   icon:'💰', color:'#2f9e44' },
   { id:'bonus',      name:'賞与',   icon:'🎁', color:'#74b816' },
@@ -4719,6 +4723,18 @@ function _saveBudgetCats() {
 
 let budgetExpenseCats = _loadBudgetCats('kuro_budget_exp_cats', _BUDGET_EXP_CATS_DEFAULT);
 let budgetIncomeCats  = _loadBudgetCats('kuro_budget_inc_cats', _BUDGET_INC_CATS_DEFAULT);
+
+// 月額支払いは通常の支出と区別する専用カテゴリへまとめる。
+(function seedSubscriptionCategory() {
+  try {
+    if (budgetExpenseCats.some(c => c.id === _BUDGET_SUBSCRIPTION_CAT.id)) return;
+    const category = { ..._BUDGET_SUBSCRIPTION_CAT };
+    const at = budgetExpenseCats.findIndex(c => c.id === 'other_exp');
+    if (at >= 0) budgetExpenseCats.splice(at, 0, category);
+    else budgetExpenseCats.push(category);
+    _saveBudgetCats();
+  } catch (_) { /* localStorage が使えない場合はデフォルトを変更しない */ }
+})();
 
 // 既存ユーザー（localStorage にカテゴリ保存済み）にも「酒」を一度だけ追加する。
 // フラグで一回きりにするので、後からユーザーが削除しても復活しない。
@@ -4861,6 +4877,81 @@ async function deleteBudgetFromSupabase(entryId) {
   }
 }
 
+// ── Monthly recurring budget entries (subscriptions / fixed payments) ──
+async function loadRecurringBudgetFromSupabase(userId) {
+  if (!db || !userId || userId === 'anon') return [];
+  try {
+    const { data, error } = await db
+      .from('recurring_budget_entries')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('active', true)
+      .order('day_of_month', { ascending: true });
+    if (error) throw error;
+    return (data || []).map(r => ({
+      id: r.recurring_id, _dbId: r.id, type: r.type, catId: r.cat_id,
+      amount: r.amount, memo: r.memo || '', dayOfMonth: r.day_of_month,
+      startDate: r.start_date, endDate: r.end_date || null
+    }));
+  } catch (e) {
+    console.error('Recurring budget load error:', e);
+    return [];
+  }
+}
+
+async function addRecurringBudgetToSupabase(entry) {
+  if (!currentUser) return false;
+  setSyncStatus('syncing');
+  try {
+    const { data, error } = await db.from('recurring_budget_entries').insert({
+      user_id: currentUser.id, recurring_id: entry.id, type: entry.type,
+      cat_id: entry.catId, amount: entry.amount, memo: entry.memo || '',
+      day_of_month: entry.dayOfMonth, start_date: entry.startDate
+    }).select().single();
+    if (error) throw error;
+    entry._dbId = data.id;
+    setSyncStatus('synced');
+    return true;
+  } catch (e) {
+    console.error('Recurring budget add error:', e);
+    setSyncStatus('error');
+    return false;
+  }
+}
+
+async function deleteRecurringBudgetFromSupabase(recurringId) {
+  if (!currentUser) return;
+  setSyncStatus('syncing');
+  try {
+    const { error } = await db.from('recurring_budget_entries')
+      .delete().eq('user_id', currentUser.id).eq('recurring_id', recurringId);
+    if (error) throw error;
+    setSyncStatus('synced');
+  } catch (e) {
+    console.error('Recurring budget delete error:', e);
+    setSyncStatus('error');
+  }
+}
+
+function _recurringEntryForMonth(recurring, monthKey) {
+  var monthStart = monthKey + '-01';
+  var parts = monthKey.split('-');
+  var days = new Date(+parts[0], +parts[1], 0).getDate();
+  var date = monthKey + '-' + _pad2(Math.min(recurring.dayOfMonth, days));
+  if (recurring.startDate > date || (recurring.endDate && recurring.endDate < monthStart)) return null;
+  return {
+    id: '_recurring_' + recurring.id + '_' + monthKey,
+    recurringId: recurring.id,
+    type: recurring.type,
+    catId: recurring.catId,
+    amount: recurring.amount,
+    memo: recurring.memo,
+    date: date,
+    createdAt: 0,
+    _isRecurring: true
+  };
+}
+
 function _budgetMonthKey() {
   const y = curDate.getFullYear();
   const m = curDate.getMonth();
@@ -4889,6 +4980,11 @@ async function _fetchPrevMonthData(userId, y, m, depth) {
   const byMonth = {};
   monthKeys.forEach(k => { byMonth[k] = []; });
   allEntries.forEach(en => { if (byMonth[en.monthKey]) byMonth[en.monthKey].push(en); });
+  const recurring = await loadRecurringBudgetFromSupabase(userId);
+  recurring.forEach(re => monthKeys.forEach(key => {
+    const generated = _recurringEntryForMonth(re, key);
+    if (generated) byMonth[key].push(generated);
+  }));
   // 古い月から複利的に積み上げ
   let priorCarryover = 0;
   let last = empty;
@@ -4924,6 +5020,7 @@ async function _syncBudgetMonth() {
     _budgetState.monthKey = mk;
     _budgetState.entries = await loadBudgetFromSupabase(_budgetState.userId, mk);
   }
+  _budgetState.recurring = await loadRecurringBudgetFromSupabase(_budgetState.userId);
   // 常に prevMonthData を再フェッチ（一括取得 1 query でコスト一定、過去月編集の即時反映を保証）
   const parts0 = mk.split('-');
   const pmd = await _fetchPrevMonthData(_budgetState.userId, +parts0[0], +parts0[1]);
@@ -4945,6 +5042,7 @@ async function initBudgetPanel(user) {
   const typeEl    = document.getElementById('js-budget-type');
   const catEl     = document.getElementById('js-budget-cat');
   const dateEl    = document.getElementById('js-budget-date');
+  const repeatEl  = document.getElementById('js-budget-repeat-monthly');
   const summaryEl = document.getElementById('js-budget-summary');
 
   if (!listEl || !formEl) return;
@@ -4961,7 +5059,8 @@ async function initBudgetPanel(user) {
     prevMonthBalance: prevMonthData.balance,
     prevMonthData,
     filter: 'all', // 'all' | 'expense' | 'income'
-    els: { listEl, formEl, amountEl, memoEl, typeEl, catEl, dateEl, summaryEl }
+    recurring: await loadRecurringBudgetFromSupabase(userId),
+    els: { listEl, formEl, amountEl, memoEl, typeEl, catEl, dateEl, repeatEl, summaryEl }
   };
 
   // Populate category dropdown
@@ -4977,6 +5076,7 @@ async function initBudgetPanel(user) {
 
   // Type toggle → update cat options
   typeEl?.addEventListener('change', () => _updateBudgetCatOptions());
+  repeatEl?.addEventListener('change', () => _syncBudgetRepeatControls());
 
   // Submit
   formEl.addEventListener('submit', async (e) => {
@@ -4984,10 +5084,12 @@ async function initBudgetPanel(user) {
     if (!_budgetState) return;
     const amount = parseInt(amountEl.value) || 0;
     if (amount <= 0) { amountEl.focus(); return; }
-    const type = typeEl?.value || 'expense';
-    const catId = catEl?.value || (type === 'expense' ? 'food' : 'salary');
     const memo = (memoEl?.value || '').trim();
     const date = dateEl?.value || _todayStr();
+    const repeatsMonthly = !!repeatEl?.checked;
+    const type = repeatsMonthly ? 'expense' : (typeEl?.value || 'expense');
+    const catId = repeatsMonthly ? _BUDGET_SUBSCRIPTION_CAT.id
+      : (catEl?.value || (type === 'expense' ? 'food' : 'salary'));
 
     // 編集モード：既存エントリを更新
     if (_budgetEditingId) {
@@ -5001,6 +5103,19 @@ async function initBudgetPanel(user) {
       } else {
         renderBudgetPanel();
       }
+      return;
+    }
+
+    if (repeatsMonthly) {
+      const id = `rb_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+      const dayOfMonth = Math.max(1, Math.min(31, +(date.slice(8, 10)) || 1));
+      const recurring = { id, type, catId, amount, memo, dayOfMonth, startDate: date };
+      _budgetState.recurring.push(recurring);
+      amountEl.value = '';
+      memoEl.value = '';
+      repeatEl.checked = false;
+      renderBudgetPanel();
+      await addRecurringBudgetToSupabase(recurring);
       return;
     }
 
@@ -5028,6 +5143,13 @@ async function initBudgetPanel(user) {
       if (!row) return;
       const id = row.getAttribute('data-budget-id');
       if (id === _budgetEditingId) _exitBudgetEditMode();
+      const recurring = _budgetState.recurring.find(re => ('_recurring_' + re.id + '_' + _budgetState.monthKey) === id);
+      if (recurring) {
+        _budgetState.recurring = _budgetState.recurring.filter(re => re.id !== recurring.id);
+        renderBudgetPanel();
+        await deleteRecurringBudgetFromSupabase(recurring.id);
+        return;
+      }
       _budgetState.entries = _budgetState.entries.filter(en => en.id !== id);
       renderBudgetPanel();
       await deleteBudgetFromSupabase(id);
@@ -5063,6 +5185,21 @@ function _updateBudgetCatOptions() {
   catEl.innerHTML = cats.map(c => `<option value="${c.id}">${c.icon} ${c.name}</option>`).join('');
 }
 
+function _syncBudgetRepeatControls() {
+  if (!_budgetState) return;
+  const { repeatEl, typeEl, catEl } = _budgetState.els;
+  const repeating = !!repeatEl?.checked;
+  if (typeEl) {
+    if (repeating) typeEl.value = 'expense';
+    typeEl.disabled = repeating;
+  }
+  _updateBudgetCatOptions();
+  if (catEl) {
+    if (repeating) catEl.value = _BUDGET_SUBSCRIPTION_CAT.id;
+    catEl.disabled = repeating;
+  }
+}
+
 // ── Budget entry edit mode ────────────────────────────────────────────────────
 
 let _budgetEditingId = null;
@@ -5071,6 +5208,9 @@ function _enterBudgetEditMode(entry) {
   if (!_budgetState) return;
   _budgetEditingId = entry.id;
   const els = _budgetState.els;
+  if (els.repeatEl) els.repeatEl.checked = false;
+  if (els.typeEl) els.typeEl.disabled = false;
+  if (els.catEl) els.catEl.disabled = false;
   if (els.typeEl) els.typeEl.value = entry.type;
   _updateBudgetCatOptions();
   if (els.catEl)    els.catEl.value    = entry.catId;
@@ -5091,6 +5231,9 @@ function _exitBudgetEditMode() {
   if (els) {
     if (els.amountEl) els.amountEl.value = '';
     if (els.memoEl)   els.memoEl.value   = '';
+    if (els.repeatEl) els.repeatEl.checked = false;
+    if (els.typeEl) els.typeEl.disabled = false;
+    if (els.catEl) els.catEl.disabled = false;
   }
   const submitBtn = document.getElementById('js-budget-submit-btn');
   const cancelBtn = document.getElementById('js-budget-cancel-edit');
@@ -5192,8 +5335,11 @@ function renderBudgetPanel() {
     });
   }
 
-  // ── Merge manual entries + carryover (シフト個別エントリは出さない) ──
-  var allEntries = entries.slice().concat(carryoverEntries);
+  // ── Merge manual entries + monthly recurring entries + carryover ──
+  var recurringEntries = (bs.recurring || []).map(function(re) {
+    return _recurringEntryForMonth(re, monthKey);
+  }).filter(Boolean);
+  var allEntries = entries.slice().concat(recurringEntries, carryoverEntries);
 
   var sorted = allEntries.slice().sort(function(a, b) {
     if (a.date !== b.date) return b.date.localeCompare(a.date);
@@ -5211,7 +5357,7 @@ function renderBudgetPanel() {
   var totalExpense = 0;
   var catSums = {};
 
-  entries.forEach(function(en) {
+  entries.concat(recurringEntries).forEach(function(en) {
     if (en.type === 'income') {
       totalIncome += en.amount;
     } else {
@@ -5350,7 +5496,8 @@ function renderBudgetPanel() {
       var gen = gItems[ii];
       var isShiftEntry = gen._isShift;
       var isCarryover = gen._isCarryover;
-      var isAuto = isShiftEntry || isCarryover;
+      var isRecurring = gen._isRecurring;
+      var isAuto = isShiftEntry || isCarryover || isRecurring;
       var isInc = gen.type === 'income';
       var gIcon, gCatName;
       if (isShiftEntry) {
@@ -5361,7 +5508,7 @@ function renderBudgetPanel() {
         var gCat = getBudgetCat(gen.catId);
         gIcon = gCat.icon; gCatName = gCat.name;
       }
-      var autoBadge = isShiftEntry ? '\u81EA\u52D5' : isCarryover ? '\u7E70\u8D8A' : '';
+      var autoBadge = isShiftEntry ? '\u81EA\u52D5' : isCarryover ? '\u7E70\u8D8A' : isRecurring ? '\u6708\u984D' : '';
       // \u7E70\u8D8A\u306F\u7B26\u53F7\u4ED8\u304D\uFF1A\u8CA0\u306E\u7E70\u8D8A\u306F\u8D64\u5B57\u30B9\u30BF\u30A4\u30EB\u3067\u300C\u2212\u00A5X\u300D\u3068\u8868\u793A
       var displaySign, amountCls;
       if (isCarryover) {
@@ -5377,7 +5524,7 @@ function renderBudgetPanel() {
         (gen.memo ? '<span class="budget-entry-memo">' + escapeHtml(gen.memo) + '</span>' : '') +
         '</div>' +
         '<span class="budget-entry-amount ' + amountCls + '">' + displaySign + fmtYen(Math.abs(gen.amount)) + '</span>' +
-        (isAuto ? '' : '<button class="budget-entry-del" type="button" title="\u524A\u9664" aria-label="\u524A\u9664">\u2715</button>') +
+        ((isShiftEntry || isCarryover) ? '' : '<button class="budget-entry-del" type="button" title="' + (isRecurring ? '\u6708\u984D\u9805\u76EE\u3092\u524A\u9664' : '\u524A\u9664') + '" aria-label="\u524A\u9664">\u2715</button>') +
         '</div>';
     }
     html += '</div>';

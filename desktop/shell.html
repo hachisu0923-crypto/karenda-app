@@ -111,6 +111,21 @@
   .win-btn.is-close:hover { background: #e03131; }
   .win-btn.is-pin.is-active { background: #f0a020; color: #fff; }  /* 最前面固定 ON */
   .win-btn svg { width: 11px; height: 11px; display: block; }
+
+  /* ── アイドル（peek）モード ── */
+  /* 沈み中に iframe を覆う透明オーバーレイ（画面部分の誤操作を遮断。展開はベゼルで） */
+  .idle-overlay {
+    position: absolute;
+    top: var(--bezel-top); left: var(--bezel-side);
+    width: var(--screen-w); height: var(--screen-h);
+    border-radius: var(--radius-screen);
+    z-index: 7;                       /* iframe/clock(6) の上、win-controls(10) の下 */
+    background: transparent; display: none; cursor: default;
+  }
+  .stage.is-idle .idle-overlay { display: block; }
+  /* アイドル中はベゼル（黒枠）クリックで展開＝ポインタカーソルで示す */
+  .stage.is-idle .phone { cursor: pointer; }
+  .win-btn.is-dock:hover { background: rgba(120, 120, 128, 0.6); }
 </style>
 </head>
 <body>
@@ -122,10 +137,14 @@
                 allow="clipboard-write; camera; autoplay; encrypted-media"></iframe>
         <div class="status-clock" id="status-clock"></div>
       </div>
+      <div class="idle-overlay" id="idle-overlay" aria-hidden="true"></div>
     </div>
     <div class="win-controls">
       <button class="win-btn is-pin" id="btn-pin" title="最前面に固定" aria-label="最前面に固定" aria-pressed="false">
         <svg viewBox="0 0 12 12"><path d="M5 1h2v3.6l1.8 1.8V8H3.2V6.4L5 4.6V1z" fill="currentColor"/><line x1="6" y1="8" x2="6" y2="11" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+      </button>
+      <button class="win-btn is-dock" id="btn-dock" title="ドック（隅に沈める）" aria-label="ドック">
+        <svg viewBox="0 0 12 12"><path d="M2.5 4.5L6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
       <button class="win-btn is-min" id="btn-min" title="最小化" aria-label="最小化">
         <svg viewBox="0 0 12 12"><line x1="2" y1="6" x2="10" y2="6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
@@ -188,7 +207,7 @@
       // ── ベゼルのドラッグでウィンドウ移動（CSS transform 下でも安定する手動実装）──
       var phone = document.getElementById('phone');
       var iframe = document.getElementById('appframe');
-      var dragging = false, sx = 0, sy = 0, pending = null, raf = 0;
+      var dragging = false, sx = 0, sy = 0, pending = null, raf = 0, moved = false;
 
       function flush() {
         raf = 0;
@@ -197,16 +216,23 @@
 
       phone.addEventListener('mousedown', function (e) {
         if (e.button !== 0) return;
-        if (e.target.closest('.win-controls')) return;   // ボタンはドラッグ起点にしない
+        if (e.target.closest('.win-controls')) return;   // ボタンはここでは扱わない
+        if (isIdle) {                                     // アイドル中：ベゼル（黒枠）クリックで下から展開
+          e.preventDefault();                             // 画面部分はオーバーレイが遮断済み（ここには来ない）
+          exitIdle();
+          return;
+        }
         if (e.target.closest('.screen')) return;          // 画面（iframe）はドラッグしない
-        dragging = true; sx = e.screenX; sy = e.screenY;
+        dragging = true; moved = false; sx = e.screenX; sy = e.screenY;
         iframe.style.pointerEvents = 'none';               // ドラッグ中は iframe にイベントを奪われない
         ctl.dragStart && ctl.dragStart();
         e.preventDefault();
       });
       window.addEventListener('mousemove', function (e) {
         if (!dragging) return;
-        pending = { dx: e.screenX - sx, dy: e.screenY - sy };
+        var dx = e.screenX - sx, dy = e.screenY - sy;
+        if (!moved && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) moved = true;   // 4px超で「ドラッグ」と判定
+        pending = { dx: dx, dy: dy };
         if (!raf) raf = requestAnimationFrame(flush);
       });
       window.addEventListener('mouseup', function () {
@@ -214,7 +240,68 @@
         dragging = false;
         iframe.style.pointerEvents = '';
         ctl.dragEnd && ctl.dragEnd();
+        if (!moved && !isIdle) enterIdle();   // 動かさずにベゼルをクリック＝アイドルへ戻す（トグル）
       });
+
+      // ── アイドル（peek）モード ─────────────────────────────────────
+      // 1分無操作で自動、またはドックボタンで手動アイドル。露出上部クリックで展開。
+      var stageEl = document.getElementById('stage');
+      var overlay = document.getElementById('idle-overlay');
+      var btnDock = document.getElementById('btn-dock');
+      var IDLE_MS = 60000;             // 1分。テスト時はここを 5000 等に一時的に下げる
+      var idleTimer = null, isIdle = false;
+
+      function clearIdleTimer() { if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; } }
+      function scheduleIdle() {
+        clearIdleTimer();
+        if (isIdle) return;
+        idleTimer = setTimeout(enterIdle, IDLE_MS);
+      }
+      function enterIdle() {
+        if (isIdle) return;
+        isIdle = true; clearIdleTimer();
+        stageEl.classList.add('is-idle');
+        if (ctl.enterIdle) ctl.enterIdle(!!pinned);   // 直前のピン状態を渡す
+      }
+      function exitIdle() {
+        if (!isIdle) return;
+        isIdle = false;
+        stageEl.classList.remove('is-idle');
+        if (ctl.exitIdle) ctl.exitIdle().then(function (restored) {
+          if (typeof restored === 'boolean' && restored !== pinned) {
+            pinned = restored;
+            localStorage.setItem('karPinTop', pinned ? '1' : '0');
+            applyPin();
+          }
+        });
+        scheduleIdle();                // 展開後に 1 分タイマーを再始動
+      }
+      if (btnDock) btnDock.addEventListener('click', function () {
+        if (isIdle) exitIdle(); else enterIdle();
+      });
+      if (overlay) overlay.addEventListener('mousedown', function (e) {
+        // 画面部分のクリックは遮断のみ（iframe に渡さない・展開はベゼルで行う）
+        e.preventDefault(); e.stopPropagation();
+      });
+
+      // 無操作検知：シェルと iframe（同一オリジン）の両方で活動を監視しタイマーを延長
+      function onActivity() { if (!isIdle) scheduleIdle(); }
+      ['mousemove', 'mousedown', 'keydown', 'wheel', 'touchstart'].forEach(function (evt) {
+        window.addEventListener(evt, onActivity, { passive: true, capture: true });
+      });
+      function attachIframeActivity() {
+        try {
+          var win = iframe.contentWindow;
+          if (!win || win.__karIdleListenersAttached) return;
+          win.__karIdleListenersAttached = true;
+          ['mousemove', 'mousedown', 'keydown', 'wheel', 'touchstart'].forEach(function (evt) {
+            win.addEventListener(evt, onActivity, { passive: true, capture: true });
+          });
+        } catch (err) { /* 同一オリジン想定だが保険で無視。シェル側検知で劣化動作 */ }
+      }
+      iframe.addEventListener('load', attachIframeActivity);
+      attachIframeActivity();          // 初回 load 済みの取りこぼしに備え即時も試行
+      scheduleIdle();                  // 起動直後からカウント開始
     })();
   </script>
 </body>

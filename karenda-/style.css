@@ -3992,6 +3992,17 @@ input  { font-family: inherit; }
 .budget-date-input  { width: 120px; flex-shrink: 0; }
 .budget-memo-input  { flex: 1; min-width: 80px; }
 
+.budget-repeat-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.budget-repeat-toggle input { accent-color: var(--color-accent); }
+
 /* ── Mobile budget ── */
 @media (max-width: 720px) {
   .budget-summary-grid {
@@ -4015,6 +4026,7 @@ input  { font-family: inherit; }
   .budget-cat-select  { width: 90px; }
   .budget-date-input  { width: 100%; }
   .budget-memo-input  { width: 100%; }
+  .budget-repeat-toggle { margin-left: 2px; }
 
   .budget-entry-del { opacity: 0.6; }
 

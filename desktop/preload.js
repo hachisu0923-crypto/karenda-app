@@ -21,6 +21,8 @@ contextBridge.exposeInMainWorld('electronControls', {
   minimize:  () => ipcRenderer.invoke('win:minimize'),
   close:     () => ipcRenderer.invoke('win:close'),
   setAlwaysOnTop: (flag) => ipcRenderer.invoke('win:setAlwaysOnTop', flag),
+  enterIdle: (prevPinned) => ipcRenderer.invoke('win:enterIdle', prevPinned),
+  exitIdle:  () => ipcRenderer.invoke('win:exitIdle'),
   dragStart: () => ipcRenderer.send('win:dragStart'),
   dragMove:  (dx, dy) => ipcRenderer.send('win:dragMove', dx, dy),
   dragEnd:   () => ipcRenderer.send('win:dragEnd')

@@ -3532,10 +3532,17 @@ document.getElementById('js-dv-add').addEventListener('click', () => {
 
 // ── Helpers ───────────────────────────────────────────────
 
+// I8: "9" (no minutes) used to give h*60 + undefined = NaN, which is neither
+// falsy-at-the-guard nor null, so callers treated it as a real time and laid the
+// event out at top:NaNpx — it simply vanished. Validate the shape instead of
+// trusting split(). Same regex as lib/md-daily.js parseTime, deliberately: the
+// import path and the render path must agree on what a time is.
 function timeStrToMin(t) {
-  if (!t) return null;
-  const [h, m] = t.split(':').map(Number);
-  return h * 60 + m;
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(t == null ? '' : t).trim());
+  if (!m) return null;
+  const h = +m[1], mi = +m[2];
+  if (h > 23 || mi > 59) return null;
+  return h * 60 + mi;
 }
 
 function minToY(min) {
@@ -5994,3 +6001,232 @@ document.getElementById('js-daily-plan-save').addEventListener('click', async ()
   renderMain();
   closeOverlay('js-daily-plan-overlay');
 });
+
+// ════════════════════════════════════════════════════════════
+//  OBSIDIAN VAULT (File System Access)
+// ════════════════════════════════════════════════════════════
+//
+// Supabase stays the source of truth. This writes the same data out as Markdown
+// a vault can read, and reads hand-edits back in.
+//
+// Availability: showDirectoryPicker exists on Electron and Chrome/Edge desktop
+// but not on iOS Safari or Firefox, so the whole entry point is feature-gated.
+// An iOS vault lives in iCloud, where picking a local folder has no meaning.
+//
+// Verified inside desktop/shell.html's same-origin iframe: the API is reachable
+// with the existing allow list and 127.0.0.1 is a secure context; only the user
+// gesture is needed, which the button supplies.
+
+const VAULT_DIR = 'karenda';
+let _vaultHandle = null;
+
+function _vaultLog(msg, isError) {
+  const el = document.getElementById('js-vault-log');
+  if (!el) return;
+  const line = document.createElement('div');
+  line.className = 'vault-log-line' + (isError ? ' is-error' : '');
+  line.textContent = msg;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+}
+
+function _vaultSetPath(name) {
+  const el = document.getElementById('js-vault-path');
+  if (el) el.textContent = name || '未選択';
+}
+
+// Ensure we have a handle AND live permission. Both the picker and the
+// permission re-prompt need a user gesture, so only call this from a click.
+async function _vaultReady() {
+  if (!vaultFs.isSupported()) { appNotice('この環境ではフォルダを開けません。'); return null; }
+  if (!_vaultHandle) _vaultHandle = await vaultFs.getSavedVault();
+  if (!_vaultHandle) { appNotice('先に Vault フォルダを選択してください。'); return null; }
+  const state = await vaultFs.checkPermission(_vaultHandle, true);
+  if (state !== 'granted') { appNotice('フォルダへのアクセスが許可されませんでした。'); return null; }
+  return _vaultHandle;
+}
+
+async function vaultExport() {
+  const root = await _vaultReady();
+  if (!root) return;
+
+  const y = curDate.getFullYear(), m = curDate.getMonth();
+  const monthLabel = `${y}-${String(m + 1).padStart(2, '0')}`;
+  const ok = await appConfirm(
+    `${monthLabel} の予定と、家計簿・タスク・目標を「${root.name}/${VAULT_DIR}」に書き出します。\n同名のファイルは上書きされます。`,
+    '書き出す'
+  );
+  if (!ok) return;
+
+  try {
+    const base = await vaultFs.dir(root, VAULT_DIR, true);
+    const catName = id => getCat(id)?.name || '';
+    let n = 0;
+
+    // Daily notes for the displayed month
+    const daily = await vaultFs.dir(base, 'daily', true);
+    const dim = new Date(y, m + 1, 0).getDate();
+    for (let d = 1; d <= dim; d++) {
+      const key = dateKey(y, m, d);
+      const evs = events[key];
+      if (!evs || !evs.length) continue;
+      await vaultFs.writeFile(daily, `${key}.md`, mdDaily.toDailyNote(key, evs, catName));
+      n++;
+    }
+    _vaultLog(`デイリーノート ${n} 件を書き出しました`);
+
+    // Budget entries
+    if (_budgetState && _budgetState.entries && _budgetState.entries.length) {
+      const bd = await vaultFs.dir(base, 'budget', true);
+      let bn = 0;
+      for (const e of _budgetState.entries) {
+        const cn = getBudgetCat(e.catId)?.name || '';
+        const fname = mdNote.safeFileName(`${e.date} ${cn} ${e.id}`) + '.md';
+        await vaultFs.writeFile(bd, fname, mdNote.budgetToNote(e, cn));
+        bn++;
+      }
+      _vaultLog(`家計簿 ${bn} 件を書き出しました`);
+    }
+
+    // Tasks
+    if (_taskState && _taskState.tasks && _taskState.tasks.length) {
+      const td = await vaultFs.dir(base, 'tasks', true);
+      let tn = 0;
+      for (const t of _taskState.tasks) {
+        const fname = mdNote.safeFileName(`${t.title || 'task'} ${t.id}`) + '.md';
+        await vaultFs.writeFile(td, fname, mdNote.taskToNote(t));
+        tn++;
+      }
+      _vaultLog(`タスク ${tn} 件を書き出しました`);
+    }
+
+    // Goals — localStorage only, so this is the only way they leave the device.
+    if (currentUser) {
+      const goals = _loadGoal(currentUser.id) || {};
+      const keys = Object.keys(goals);
+      if (keys.length) {
+        const gd = await vaultFs.dir(base, 'goals', true);
+        let gn = 0;
+        for (const dk of keys) {
+          const list = Array.isArray(goals[dk]) ? goals[dk] : (goals[dk] && goals[dk].subs) || [];
+          for (const g of list) {
+            if (!g || !g.id) continue;
+            const fname = mdNote.safeFileName(`${dk} ${g.id}`) + '.md';
+            await vaultFs.writeFile(gd, fname, mdNote.goalToNote(g, dk));
+            gn++;
+          }
+        }
+        if (gn) _vaultLog(`目標 ${gn} 件を書き出しました`);
+      }
+    }
+
+    appNotice('Vault に書き出しました。');
+  } catch (e) {
+    console.error('vault export error:', e);
+    _vaultLog('書き出しに失敗: ' + (e.message || e), true);
+    appNotice('書き出しに失敗しました。');
+  }
+}
+
+async function vaultImport() {
+  const root = await _vaultReady();
+  if (!root) return;
+
+  const y = curDate.getFullYear(), m = curDate.getMonth();
+  const monthLabel = `${y}-${String(m + 1).padStart(2, '0')}`;
+  const ok = await appConfirm(
+    `「${root.name}/${VAULT_DIR}/daily」から ${monthLabel} の予定を読み込み、この月の予定を置き換えます。\nこの操作は元に戻せません。`,
+    '読み込む'
+  );
+  if (!ok) return;
+
+  try {
+    const base = await vaultFs.dir(root, VAULT_DIR, false);
+    const daily = await vaultFs.dir(base, 'daily', false);
+    const names = (await vaultFs.listMarkdown(daily)).filter(n => n.startsWith(monthLabel));
+    if (!names.length) {
+      _vaultLog(`${monthLabel} のデイリーノートが見つかりません`, true);
+      appNotice('対象のノートがありません。');
+      return;
+    }
+
+    // Resolve a #tag back to a category; never invent one.
+    const catIdByTag = tag => {
+      if (!tag) return null;
+      const c = categories.find(c => String(c.name).replace(/\s+/g, '_') === tag);
+      return c ? c.id : null;
+    };
+
+    let added = 0, unknown = 0;
+    for (const name of names) {
+      const text = await vaultFs.readFile(daily, name);
+      if (text == null) continue;
+      const key = mdDaily.dateKeyFromNote(text) || name.replace(/\.md$/i, '');
+      const parsed = mdDaily.fromDailyNote(text, catIdByTag);
+
+      // Replace the day: delete what is there, then insert what the note says.
+      for (const old of (events[key] || [])) {
+        if (old._dbId) await deleteEventFromSupabase(old);
+      }
+      events[key] = [];
+      for (const ev of parsed) {
+        if (ev.catId == null) {
+          unknown++;
+          ev.catId = selectedCatId ?? categories[0]?.id;
+          if (ev.catId == null) continue;   // no categories at all — skip
+        }
+        const clean = {
+          catId: ev.catId, title: ev.title, time: ev.time, timeEnd: ev.timeEnd,
+          shiftStart: ev.shiftStart, shiftEnd: ev.shiftEnd,
+          breakMinutes: ev.breakMinutes, overtimeMinutes: ev.overtimeMinutes,
+          reminderMinutes: ev.reminderMinutes,
+        };
+        events[key].push(clean);
+        await addEventToSupabase(key, clean);
+        added++;
+      }
+      _vaultLog(`${name}: ${parsed.length} 件`);
+    }
+
+    renderAll();
+    if (unknown) appNotice(`${added} 件を読み込みました（未知のカテゴリ ${unknown} 件は既定カテゴリにしました）。`);
+    else appNotice(`${added} 件を読み込みました。`);
+  } catch (e) {
+    console.error('vault import error:', e);
+    _vaultLog('読み込みに失敗: ' + (e.message || e), true);
+    appNotice('読み込みに失敗しました。');
+  }
+}
+
+(function initVault() {
+  const ribbonBtn = document.getElementById('js-ribbon-vault');
+  // Feature-gate the whole entry point (iOS Safari / Firefox have no picker).
+  if (!vaultFs.isSupported()) { if (ribbonBtn) ribbonBtn.remove(); return; }
+  if (ribbonBtn) ribbonBtn.hidden = false;
+
+  ribbonBtn?.addEventListener('click', async () => {
+    openOverlay('js-vault-overlay');
+    const saved = await vaultFs.getSavedVault();
+    if (saved) { _vaultHandle = saved; _vaultSetPath(saved.name); }
+  });
+  document.getElementById('js-vault-close')?.addEventListener('click', () => closeOverlay('js-vault-overlay'));
+  document.addEventListener('click', e => {
+    if (_isBackdropClick(e, 'js-vault-overlay')) closeOverlay('js-vault-overlay');
+  });
+
+  document.getElementById('js-vault-pick')?.addEventListener('click', async () => {
+    try {
+      const h = await vaultFs.pickVault();     // needs the user gesture we are in
+      _vaultHandle = h;
+      _vaultSetPath(h.name);
+      _vaultLog(`Vault を「${h.name}」に設定しました`);
+    } catch (e) {
+      if (e && e.name === 'AbortError') return;   // user closed the picker
+      console.error('vault pick error:', e);
+      appNotice('フォルダを選択できませんでした。');
+    }
+  });
+
+  document.getElementById('js-vault-export')?.addEventListener('click', vaultExport);
+  document.getElementById('js-vault-import')?.addEventListener('click', vaultImport);
+})();

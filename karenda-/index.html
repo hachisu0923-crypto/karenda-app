@@ -126,6 +126,10 @@
     <button class="clickable-icon" id="js-ribbon-timer" aria-label="タイマー">
       <svg class="svg-icon"><use href="#lucide-timer"/></svg>
     </button>
+    <!-- File System Access が無い環境では app.js が隠す -->
+    <button class="clickable-icon" id="js-ribbon-vault" aria-label="Obsidian Vault" hidden>
+      <svg class="svg-icon"><use href="#lucide-list-tree"/></svg>
+    </button>
   </div>
   <div class="side-dock-actions mod-bottom">
     <a class="clickable-icon" href="./mobile-preview.html" target="_blank" rel="noopener" aria-label="スマホ表示プレビュー">
@@ -1050,6 +1054,63 @@
   </div>
 </div>
 
+<!-- ═══════════ VAULT (Obsidian フォルダ連携) ═══════════
+     showDirectoryPicker が無い環境（iOS Safari / Firefox）では、app.js が
+     この導線ごと隠す。iOS の vault は iCloud 上にあり「ローカルフォルダを
+     選ぶ」概念自体が無いため。 -->
+<div class="modal-container overlay" id="js-vault-overlay">
+  <div class="modal-bg"></div>
+  <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="js-vault-title">
+    <div class="modal-header">
+      <div>
+        <div class="modal-header-title" id="js-vault-title"><svg class="svg-icon"><use href="#lucide-list-tree"/></svg><span>Obsidian Vault</span></div>
+        <div class="modal-header-sub">予定を Markdown ノートとして書き出し／読み込み</div>
+      </div>
+      <button class="modal-close-button modal-close-btn" id="js-vault-close" aria-label="閉じる"><svg class="svg-icon"><use href="#lucide-x"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <div class="setting-item">
+        <div class="setting-item-info">
+          <div class="setting-item-name">Vault フォルダ</div>
+          <div class="setting-item-description" id="js-vault-path">未選択</div>
+        </div>
+        <div class="setting-item-control">
+          <button class="btn-secondary" id="js-vault-pick">選択</button>
+        </div>
+      </div>
+
+      <div class="setting-item">
+        <div class="setting-item-info">
+          <div class="setting-item-name">書き出し</div>
+          <div class="setting-item-description">
+            表示中の月の予定を <code>karenda/daily/YYYY-MM-DD.md</code> に、
+            家計簿・タスク・目標を <code>karenda/</code> 配下の個別ノートに書き出します。
+            同名ファイルは上書きされます。
+          </div>
+        </div>
+        <div class="setting-item-control">
+          <button class="btn-primary mod-cta" id="js-vault-export" style="width:auto;padding:6px 14px">書き出す</button>
+        </div>
+      </div>
+
+      <div class="setting-item">
+        <div class="setting-item-info">
+          <div class="setting-item-name">読み込み</div>
+          <div class="setting-item-description">
+            <code>karenda/daily/</code> のデイリーノートを読み、表示中の月の予定を
+            置き換えます。Obsidian 側での手編集を取り込むときに使います。
+          </div>
+        </div>
+        <div class="setting-item-control">
+          <button class="btn-secondary" id="js-vault-import">読み込む</button>
+        </div>
+      </div>
+
+      <div id="js-vault-log" class="vault-log" aria-live="polite"></div>
+    </div>
+  </div>
+</div>
+
 <!-- ═══════════ MOBILE: FAB (＋ 予定追加) ═══════════ -->
 <button class="fab" id="js-fab-add" type="button" aria-label="予定を追加">＋</button>
 
@@ -1143,6 +1204,9 @@
 <script src="lib/md-inline.js"></script>
 <script src="lib/md-daily.js"></script>
 <script src="lib/md-note.js"></script>
+<!-- vault-fs は純粋ではない（showDirectoryPicker / IndexedDB を触る）ので
+     node --test の対象外。供給する側のシリアライザがテストされている。 -->
+<script src="lib/vault-fs.js"></script>
 <script src="app.js"></script>
 <script src="app-init.js"></script>
 </body>

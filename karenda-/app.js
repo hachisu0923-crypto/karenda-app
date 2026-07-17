@@ -118,7 +118,18 @@ let _colorMode     = 'calendar'; // 'calendar' | 'budget_exp' | 'budget_inc'
 let isDark         = loadLocalJSON('cal_dark') ?? true;   // Obsidian の既定はダーク
 let activeTab      = 'event';
 let currentUser    = null;
-let currentView    = 'month';  // 'month' | 'week' | 'day' | 'budget' | 'goal' | 'task'
+let currentView    = 'month';  // 'month' | 'week' | 'day' | 'budget' | 'goal' | 'task' | 'graph'
+
+// ── Graph view state ──
+// ここで宣言するのは位置の問題: applyTheme() はブートストラップで走り
+// _graphTheme を読む。ファイル末尾で let すると TDZ に入り、起動時に
+// ReferenceError で app.js 全体が止まる（VIEW_ELS 以降が全部消える）。
+let _graphSim = null;      // 現在のシミュレーション
+let _graphData = null;     // 現在の { nodes, edges, adj }
+let _graphMonth = null;    // 組み立て済みの月（'YYYY-MM'）
+let _graphCam = { zoom: 1, tx: 0, ty: 0 };
+// canvas は CSS 変数を読めないので getComputedStyle で拾って持つ。捨てるのは applyTheme()。
+let _graphTheme = null;
 
 // ── Japan Holidays ─────────────────────────────────────────────────────────────
 
@@ -1002,6 +1013,10 @@ function applyTheme(dark) {
   // リボンのアイコンは「切り替えた先」を示す（ダーク中は sun＝明るくする）。
   document.querySelector('#js-theme-toggle .svg-icon use')
     ?.setAttribute('href', dark ? '#lucide-sun' : '#lucide-moon');
+  // canvas は CSS 変数を追えないので、テーマの色を持っているのはここで捨てる。
+  // theme-dark/theme-light を切り替えるのはこの関数だけなので、無効化もここだけ。
+  _graphTheme = null;
+  if (currentView === 'graph') renderGraphView();
 }
 function toggleTheme() {
   isDark = !isDark; applyTheme(isDark); saveLocalJSON('cal_dark', isDark);
@@ -2965,7 +2980,7 @@ function escHtml(s){
 
 const VIEW_LABELS = {
   month: 'Month', week: 'Week', day: 'Day',
-  budget: '家計簿', goal: '目標', task: 'タスク',
+  budget: '家計簿', goal: '目標', task: 'タスク', graph: 'グラフ',
 };
 
 function updateStatusBar() {
@@ -3011,6 +3026,7 @@ function renderAll(){
     case 'day':    renderDayView(); break;
     case 'task':   if (typeof _taskState !== 'undefined' && _taskState) renderTaskPanel(); break;
     case 'goal':   renderGoalList(); break;
+    case 'graph':  renderGraphView(); break;
     case 'budget':
       if (typeof _budgetState !== 'undefined' && _budgetState) {
         _syncBudgetMonth().then(function() { renderBudgetPanel(); });
@@ -3155,6 +3171,7 @@ const VIEW_ELS = {
   budget: 'js-budget-view',
   goal:   'js-goal-view',
   task:   'js-task-view',
+  graph:  'js-graph-view',
 };
 
 function switchView(view) {
@@ -3188,6 +3205,9 @@ function switchView(view) {
   }
   if (view === 'task')  { if (_taskState) renderTaskPanel(); }
   if (view === 'goal')  { renderGoalList(); }
+  // グラフは display:none の間 getBoundingClientRect が 0x0 を返すので、
+  // 表示に切り替わったこの時点でしかキャンバスの寸法を確定できない。
+  if (view === 'graph') { renderGraphView(); }
 }
 
 // タブとモバイルツールバーは同じ data-view を持つ。id 個別指定のリスナーは
@@ -6054,3 +6074,135 @@ async function vaultImport() {
   document.getElementById('js-vault-export')?.addEventListener('click', vaultExport);
   document.getElementById('js-vault-import')?.addEventListener('click', vaultImport);
 })();
+
+// ════════════════════════════════════════════════════════════
+//  GRAPH VIEW (Obsidian のグラフビュー相当)
+// ════════════════════════════════════════════════════════════
+//
+// 日付を中心に、予定・タスク・カテゴリが繋がる力学グラフ。
+// モデル（何がノードで何が繋がるか）は lib/graph-model.js、力学は
+// lib/graph-force.js。どちらも純粋関数で node --test の対象。ここに残るのは
+// canvas・寸法・テーマの読み取りといった副作用だけ。
+
+function graphTheme() {
+  if (_graphTheme) return _graphTheme;
+  const cs = getComputedStyle(document.body);
+  const t = k => cs.getPropertyValue(k).trim();   // 先頭に空白が付くので trim 必須
+  _graphTheme = {
+    line:    t('--graph-line'),
+    node:    t('--graph-node'),
+    focused: t('--graph-node-focused'),
+    attach:  t('--graph-node-attachment'),
+    text:    t('--graph-text'),
+    faint:   t('--text-faint'),
+  };
+  return _graphTheme;
+}
+
+// ノードの色。モデルは CSS を知らないので、色を持たないノード（日付・タスク・
+// catId が壊れた予定）はここでテーマから決める。
+function graphNodeColor(n, th) {
+  if (n.color) return n.color;
+  if (n.kind === 'task') return th.attach;
+  return th.node;
+}
+
+function _graphCanvas() { return document.getElementById('js-graph-canvas'); }
+
+// キャンバスを CSS ピクセルで扱えるようにする（以降 ctx は CSS px で描ける）。
+// display:none の間は 0x0 が返るので、呼べるのは表示後だけ。
+function _graphResize() {
+  const cv = _graphCanvas();
+  if (!cv) return null;
+  const wrap = cv.parentElement;
+  const r = wrap.getBoundingClientRect();
+  if (r.width === 0 || r.height === 0) return null;   // まだ非表示
+  const dpr = window.devicePixelRatio || 1;
+  const w = Math.round(r.width), h = Math.round(r.height);
+  if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) {
+    cv.width = Math.round(w * dpr);
+    cv.height = Math.round(h * dpr);
+    cv.style.width = w + 'px';
+    cv.style.height = h + 'px';
+  }
+  const ctx = cv.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { ctx, w, h };
+}
+
+function _graphDraw() {
+  const s = _graphResize();
+  if (!s || !_graphData) return;
+  const { ctx, w, h } = s;
+  const th = graphTheme();
+  const cam = _graphCam;
+  const nodes = _graphData.nodes, edges = _graphData.edges;
+
+  ctx.clearRect(0, 0, w, h);
+
+  const sx = n => n.x * cam.zoom + cam.tx;
+  const sy = n => n.y * cam.zoom + cam.ty;
+
+  // エッジ。色は1種類なので1本のパスにまとめて stroke は1回だけ。
+  ctx.strokeStyle = th.line;
+  ctx.lineWidth = Math.max(0.5, 1 * cam.zoom);
+  ctx.globalAlpha = 0.6;
+  ctx.beginPath();
+  const byId = new Map(nodes.map(n => [n.id, n]));
+  for (const e of edges) {
+    const a = byId.get(e.source), b = byId.get(e.target);
+    if (!a || !b) continue;
+    ctx.moveTo(sx(a), sy(a));
+    ctx.lineTo(sx(b), sy(b));
+  }
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  // ノード
+  for (const n of nodes) {
+    ctx.fillStyle = graphNodeColor(n, th);
+    ctx.beginPath();
+    ctx.arc(sx(n), sy(n), Math.max(1, n.r * cam.zoom), 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // ラベル。ズームが浅いと潰れるので出さない（Obsidian の text fade と同じ考え）。
+  const fade = cam.zoom < 0.55 ? 0 : cam.zoom > 0.9 ? 1 : (cam.zoom - 0.55) / 0.35;
+  if (fade > 0) {
+    ctx.globalAlpha = fade;
+    ctx.fillStyle = th.text;
+    ctx.font = '11px ' + getComputedStyle(document.body).fontFamily;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    for (const n of nodes) {
+      const label = n.label.length > 18 ? n.label.slice(0, 17) + '…' : n.label;
+      ctx.fillText(label, sx(n), sy(n) + n.r * cam.zoom + 3);
+    }
+    ctx.globalAlpha = 1;
+  }
+}
+
+// グラフを組み直す。月が変わったときだけレイアウトを取り直す。
+function renderGraphView() {
+  const view = document.getElementById('js-graph-view');
+  if (!view) return;
+
+  const mk = formatYM(curDate);
+  const rebuild = _graphMonth !== mk || !_graphData;
+
+  _graphData = graphModel.buildGraph({
+    year: curDate.getFullYear(),
+    month: curDate.getMonth(),
+    events: events,
+    categories: categories,
+    tasks: (typeof _taskState !== 'undefined' && _taskState) ? _taskState.tasks : [],
+  });
+  _graphMonth = mk;
+
+  _graphSim = graphForce.createSim(_graphData);
+  graphForce.settle(_graphSim);
+
+  const s = _graphResize();
+  if (s && rebuild) _graphCam = graphForce.fitToView(_graphData.nodes, s.w, s.h);
+  _graphDraw();
+}

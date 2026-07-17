@@ -321,6 +321,15 @@ body {
   --nav-collapse-icon-color:   var(--text-faint);
   --icon-color: var(--text-muted);
 
+  /* — Graph (Obsidian の実トークン。app.css より) —
+     canvas は CSS 変数を直接読めないので、app.js が getComputedStyle で
+     ここから拾ってキャッシュし、applyTheme() で無効化する。 */
+  --graph-text:            var(--text-normal);
+  --graph-line:            var(--color-base-35);
+  --graph-node:            var(--text-muted);
+  --graph-node-focused:    var(--text-accent);
+  --graph-node-attachment: var(--color-yellow);
+
   /* — Links / tags (Obsidian の実トークン) — */
   --link-color:      var(--text-accent);
   --link-decoration: underline;
@@ -3560,6 +3569,21 @@ body.is-phone .status-bar { display: none; }
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
+}
+
+/* グラフは全面キャンバス。.panel-view のスクロールを打ち消す。
+   touch-action:none が無いと、ブラウザがスクロール判定を始めた時点で
+   pointermove が来なくなり、パンもドラッグも死ぬ。 */
+.graph-view {
+  overflow: hidden;
+  position: relative;
+  background: var(--background-primary);
+}
+.graph-view canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  touch-action: none;
 }
 
 /* ── Section wrapper ── */

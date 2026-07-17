@@ -88,9 +88,37 @@
      密度の調整はこのトークン1つで行う。 */
   --header-height: 26px;
   --ribbon-width: 44px;
+  --ribbon-padding: var(--size-4-2) var(--size-4-1) var(--size-4-3);
   --status-bar-font-size: var(--font-ui-smaller);
   --status-bar-radius: var(--radius-m) 0 0 0;
+  --status-bar-border-width: var(--border-width) 0 0 var(--border-width);
   --nav-item-size: var(--font-ui-small);
+  --nav-item-padding: var(--size-4-1) var(--size-4-2) var(--size-4-1) var(--size-4-6);
+  --nav-item-margin-bottom: var(--size-2-1);
+  --nav-item-children-padding-start: var(--size-2-2);
+  --nav-item-children-margin-start: var(--size-4-3);
+  --tab-font-size: var(--font-ui-small);
+  --tab-font-weight: inherit;
+  --tab-outline-width: 1px;
+  --tab-curve: 6px;
+  --blur-radius-s: 6px;
+  --clickable-icon-radius: var(--radius-s);
+  --line-height-tight: 1.3;
+  --dialog-width: 560px;
+  --dialog-max-width: 80vw;
+  --dialog-max-height: 85vh;
+  --modal-border-width: var(--border-width);
+  --cursor: default;
+
+  /* — Stacking order (Obsidian の --layer-*) — */
+  --layer-cover:      5;
+  --layer-sidedock:   10;
+  --layer-status-bar: 15;
+  --layer-popover:    30;
+  --layer-modal:      50;
+  --layer-notice:     60;
+  --layer-menu:       65;
+  --layer-tooltip:    70;
 
   /* — Scrollbar — */
   --scrollbar-radius: var(--radius-l);
@@ -255,11 +283,16 @@ body {
   --status-bar-border-color: var(--divider-color);
   --tab-background-active: var(--background-primary);
   --tab-text-color:        var(--text-faint);
-  --tab-text-color-active: var(--text-muted);
-  --modal-background: var(--background-primary);
+  --tab-text-color-active: var(--text-normal);
+  --tab-container-background: var(--background-secondary);
+  --tab-outline-color: var(--divider-color);
+  --modal-background:   var(--background-primary);
+  --modal-border-color: var(--background-modifier-border-focus);
   --nav-item-color:            var(--text-muted);
   --nav-item-color-hover:      var(--text-normal);
   --nav-item-background-hover: var(--background-modifier-hover);
+  --nav-collapse-icon-color:   var(--text-faint);
+  --icon-color: var(--text-muted);
 
   /* — Scrollbar — */
   --scrollbar-bg:              rgba(var(--mono-rgb-100), 0.05);
@@ -382,9 +415,6 @@ body {
   --icon-stroke: var(--icon-xl-stroke-width);
 }
 
-/* 18px の枠に収めるロゴ */
-.blender-logo { --icon-size: var(--icon-s); }
-
 /* 給料サマリの行内など、9〜10px の極小文字に添えるアイコン */
 .overtime-label,
 .budget-jcb-badge,
@@ -423,278 +453,320 @@ input  { font-family: inherit; }
 body, body * { scrollbar-width: thin; scrollbar-color: var(--color-scrollbar) transparent; }
 
 /* ============================================================
-   APP SHELL (Blender-style full-viewport layout)
+   APP SHELL — Obsidian workspace layout
+   ribbon | (left split | root split | right split)
+   ステータスバーは Obsidian と同じく右下に浮かせる。
    ============================================================ */
 .app-shell {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;        /* ribbon が縦帯なので行方向 */
   height: 100vh;
   height: 100dvh;   /* iOS Safari: 100vh assumes the toolbar is collapsed, causing fixed bottom bars to overlap in-flow content */
   overflow: hidden;
 }
 
 /* ============================================================
-   BLENDER TOP MENU BAR
+   RIBBON — Obsidian の左端アイコン列
    ============================================================ */
-.blender-menubar {
+.workspace-ribbon {
+  width: var(--ribbon-width);
+  flex: 0 0 var(--ribbon-width);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background-color: var(--ribbon-background);
+  z-index: var(--layer-sidedock);
+  color: var(--text-muted);
+  padding: var(--ribbon-padding);
+  gap: var(--size-4-1);
+}
+.workspace-ribbon.mod-left {
+  border-right: var(--divider-width) solid var(--divider-color);
+}
+
+/* Obsidian 本体と同じ機構: body から show-ribbon が外れると畳まれる。
+   モバイルはリボンを持たず、ハンバーガー＋ドロワーで代替する。 */
+body:not(.show-ribbon) { --ribbon-width: 0px; }
+body:not(.show-ribbon) .workspace-ribbon { display: none; }
+
+.side-dock-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--size-4-1);
+}
+.side-dock-actions.mod-bottom { margin-top: auto; }
+
+/* ============================================================
+   CLICKABLE ICON — Obsidian の汎用アイコンボタン
+   ============================================================ */
+.clickable-icon {
+  background-color: transparent;
+  border: none;
   display: flex;
   align-items: center;
-  height: 32px;
-  background: var(--color-bg-menubar);
-  border-bottom: 1px solid var(--color-separator);
-  flex-shrink: 0;
-  gap: 0;
-  z-index: 20;
+  justify-content: center;
+  padding: var(--size-2-2) var(--size-2-3);
+  cursor: var(--cursor);
+  border-radius: var(--clickable-icon-radius);
+  color: var(--icon-color);
+  height: auto;
+  text-decoration: none;
+}
+.clickable-icon:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.clickable-icon.is-active {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-accent);
+}
+
+/* ============================================================
+   WORKSPACE — 左スプリット / ルート / 右スプリット を横に並べる
+   ============================================================ */
+.workspace {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* ============================================================
+   TAB HEADERS — Obsidian のタブバー
+   Month/Week/Day は閉じられないので mod-pinned（ピン留めタブ）として描く。
+   ============================================================ */
+.workspace-tab-header-container {
+  display: flex;
+  align-items: center;
+  background-color: var(--tab-container-background);
+  height: var(--header-height);
+  border-bottom: var(--tab-outline-width) solid var(--tab-outline-color);
+  flex: 0 0 auto;
+  padding-left: var(--size-4-1);
+  padding-right: var(--size-4-1);
   position: relative;
 }
-
-.blender-menubar-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 10px;
-  flex-shrink: 0;
-}
-
-.blender-logo {
-  width: 18px; height: 18px;
-  background-color: var(--color-accent);
-  border-radius: 2px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 10px;
-  flex-shrink: 0;
-}
-
-.blender-app-name {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--color-text-secondary);
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-.blender-menubar-sep {
-  display: inline-block;
-  width: 1px;
-  height: 14px;
-  background: var(--color-border-strong);
-  margin: 0 4px;
-  opacity: 0.5;
-}
-
-.blender-workspace-tabs {
+.workspace-tab-header-container-inner {
   display: flex;
   align-items: stretch;
+  gap: var(--size-2-1);
   height: 100%;
-  flex: 1;
-  justify-content: center;
-  gap: 2px;
-  padding: 2px 0;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
+.workspace-tab-header-container-inner::-webkit-scrollbar { display: none; }
 
-/* Blender 5.0+ pill-shaped workspace tabs */
-.workspace-tab {
+.workspace-tab-header {
   display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 2px 14px;
-  background: var(--color-bg-workspace-tab);
-  border: none;
-  border-radius: var(--radius-pill);
-  color: var(--color-text-secondary);
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  white-space: nowrap;
-  transition: color 0.15s, background-color 0.15s;
+  align-items: stretch;
+  color: var(--tab-text-color);
   cursor: pointer;
+  user-select: none;
+  flex: 0 0 auto;
 }
-
-.workspace-tab:hover {
-  color: var(--color-text-primary);
-  background: var(--color-bg-workspace-tab-hover);
+.workspace-tab-header-inner {
+  align-items: center;
+  display: flex;
+  gap: var(--size-2-1);
+  height: 100%;
+  border-radius: var(--tab-radius);
+  overflow: hidden;
+  padding: 0 var(--size-4-2);
+  width: 100%;
 }
-
-.workspace-tab.is-active {
-  background: var(--color-bg-workspace-tab-active);
-  color: var(--color-text-primary);
-  font-weight: 600;
+.workspace-tab-header:hover .workspace-tab-header-inner {
+  background-color: var(--background-modifier-hover);
 }
-
-.workspace-tab-icon {
-  flex-shrink: 0;
-  opacity: 0.7;
+.workspace-tab-header.is-active {
+  color: var(--tab-text-color-active);
 }
-.workspace-tab.is-active .workspace-tab-icon { opacity: 1; }
-
-.blender-menubar-right {
+.workspace-tab-header.is-active .workspace-tab-header-inner {
+  background-color: var(--tab-background-active);
+  border-radius: var(--tab-radius-active);
+}
+.workspace-tab-header-inner-icon {
+  flex: 0 0 auto;
+  display: flex;
+  --icon-size: var(--icon-xs);
+}
+.workspace-tab-header-inner-title {
+  flex: 1 1 auto;
+  font-size: var(--tab-font-size);
+  font-weight: var(--tab-font-weight, inherit);
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* ピン留めの印。Obsidian では閉じる × の位置に出る。 */
+.workspace-tab-header-status-container {
   display: flex;
   align-items: center;
-  padding: 0 8px;
-  flex-shrink: 0;
-  gap: 4px;
+  --icon-size: 10px;
+  opacity: 0.4;
 }
+.workspace-tab-header:not(.mod-pinned) .workspace-tab-header-status-container { display: none; }
 
 /* ============================================================
-   LAYOUT
+   VIEW HEADER — Obsidian のビュー見出し（旧 Blender viewport-header）
    ============================================================ */
-.layout { display: flex; flex: 1; min-height: 0; overflow: hidden; }
-
-/* ============================================================
-   BLENDER PANEL HEADERS
-   ============================================================ */
-.blender-panel-header {
+.view-header {
   display: flex;
   align-items: center;
-  height: var(--panel-header-h);
-  background: var(--color-bg-panel-header);
-  border-bottom: 1px solid var(--color-separator);
-  padding: 0 10px;
-  gap: 6px;
+  height: var(--header-height);
   flex-shrink: 0;
+  padding: 0 var(--size-4-2);
+  gap: var(--size-4-2);
+  background-color: var(--background-primary);
+  border-bottom: var(--divider-width) solid var(--divider-color);
   user-select: none;
 }
-
-.panel-grip {
+.view-header-title-container {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 0 2px;
-  cursor: default;
-  flex-shrink: 0;
-}
-.panel-grip::before,
-.panel-grip::after {
-  content: '';
-  display: block;
-  width: 8px;
-  height: 2px;
-  background: var(--color-grip);
-  border-radius: 1px;
-}
-
-.panel-icon {
-  color: var(--color-text-secondary);
-  flex-shrink: 0;
-  opacity: 0.8;
-}
-
-.panel-header-title {
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--color-text-secondary);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-.panel-header-sep {
+  align-items: baseline;
+  gap: var(--size-4-2);
+  min-width: 0;
   flex: 1;
 }
-
-/* ============================================================
-   VIEWPORT HEADER (Main panel navigation)
-   ============================================================ */
-.viewport-header {
-  background: var(--color-bg-panel-header);
-  border-bottom: 1px solid var(--color-separator);
+.view-header-title {
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-semibold);
+  color: var(--text-normal);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.view-header-title-parent {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.view-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--size-2-1);
+  flex-shrink: 0;
 }
 
-.topbar-nav { display: flex; align-items: center; gap: 3px; }
-
-.topbar-title-group {
-  margin-left: 6px;
-}
-
-.topbar-title { font-size: 14px; font-weight: 600; color: var(--color-text-primary); line-height: 1.2; }
-.topbar-sub   { font-size: 10px; color: var(--color-text-secondary); margin-top: 0; }
-
 /* ============================================================
-   STATUS BAR
+   STATUS BAR — Obsidian は右下に寄せる
    ============================================================ */
 .status-bar {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: auto;
+  border-radius: var(--status-bar-radius);
+  border-style: solid;
+  border-width: var(--status-bar-border-width);
+  border-color: var(--status-bar-border-color);
+  background-color: var(--status-bar-background);
+  color: var(--status-bar-text-color);
   display: flex;
+  font-size: var(--status-bar-font-size);
+  justify-content: flex-end;
   align-items: center;
-  justify-content: space-between;
-  height: 22px;
-  padding: 0 10px;
-  background: var(--color-bg-status);
-  border-top: 1px solid var(--color-separator);
+  min-height: 18px;
+  padding: var(--size-4-1);
+  gap: var(--size-4-1);
+  user-select: none;
+  z-index: var(--layer-status-bar);
+  font-variant-numeric: tabular-nums;
+}
+.status-bar-item {
+  border-radius: var(--radius-s);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--size-2-2);
+  padding: 3px var(--size-2-2);
+  line-height: 1;
+  white-space: nowrap;
+  --icon-size: 12px;
+}
+.status-bar-item:empty { display: none; }
+.status-bar-item.mod-clickable { cursor: var(--cursor); }
+.status-bar-item.sync-indicator.error   { color: var(--text-error); }
+.status-bar-item.sync-indicator.synced  { color: var(--text-success); }
+.status-bar-item.sync-indicator.syncing { color: var(--text-muted); }
+
+/* モバイルではステータスバーが下部ツールバーと重なるので隠す
+   （Obsidian モバイルもステータスバーを出さない）。 */
+body.is-phone .status-bar { display: none; }
+/* ============================================================
+   NAV HEADER + TREE ITEMS — Obsidian の左サイドバー
+   （旧 Blender の "Outliner" パネルヘッダと sidebar-section）
+   ============================================================ */
+.nav-header {
+  padding: var(--size-4-2);
   flex-shrink: 0;
-  z-index: 10;
-  gap: 0;
 }
-
-.status-bar-left,
-.status-bar-right {
+.nav-buttons-container {
   display: flex;
   align-items: center;
-  gap: 0;
+  gap: var(--size-4-1);
+  color: var(--text-muted);
+  --icon-size: var(--icon-xs);
+}
+.nav-header-title {
+  font-size: var(--font-ui-smaller);
+  font-weight: var(--font-medium);
 }
 
-.status-item {
-  font-size: 10px;
-  color: var(--color-text-secondary);
-  font-family: var(--font-monospace);
+.tree-item {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+/* Obsidian の .tree-item-self。見出しは全幅クリック可能。 */
+.tree-item-self {
+  align-items: center;
+  display: flex;
+  gap: var(--size-2-2);
+  border-radius: var(--nav-item-radius);
+  color: var(--nav-item-color);
+  font-size: var(--nav-item-size);
+  line-height: var(--line-height-tight);
+  margin-bottom: var(--nav-item-margin-bottom);
+  padding: var(--size-4-1) var(--size-4-2);
+  position: relative;
+}
+.tree-item-self.is-clickable { cursor: var(--cursor); }
+.tree-item-self:hover {
+  background-color: var(--nav-item-background-hover);
+  color: var(--nav-item-color-hover);
+}
+.tree-item-inner {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.status-sep {
-  font-size: 10px;
-  color: var(--color-text-disabled);
-  padding: 0 8px;
-}
-
-/* ============================================================
-   SIDEBAR SECTION TOGGLES
-   ============================================================ */
-.sidebar-section {
-  display: flex;
-  flex-direction: column;
-}
-
-.sidebar-section-toggle {
+/* Obsidian の collapse-icon: chevron-down を基準に、折りたたみ時 -90°。
+   .is-open ではなく .is-collapsed が Obsidian の語彙。 */
+.collapse-icon {
   display: flex;
   align-items: center;
-  gap: 5px;
-  padding: 5px 8px;
-  background: var(--color-bg-panel-header);
-  border: none;
-  border-top: 1px solid var(--color-separator);
-  border-bottom: 1px solid var(--color-separator);
-  color: var(--color-text-secondary);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  width: 100%;
-  text-align: left;
-  cursor: pointer;
-  transition: background-color 0.1s;
 }
-.sidebar-section-toggle:hover {
-  background: var(--color-bg-hover);
-  color: var(--color-text-primary);
+.collapse-icon svg.svg-icon {
+  color: var(--nav-collapse-icon-color);
+  stroke-width: 4px;
+  width: 10px;
+  height: 10px;
+  transition: transform 100ms ease-in-out;
 }
-
-.section-chevron {
-  font-size: 8px;
-  color: var(--color-text-disabled);
-  transition: transform 0.15s;
-  display: inline-block;
-}
-.section-chevron.is-open {
-  transform: rotate(0deg);
-}
-.section-chevron:not(.is-open) {
+.collapse-icon.is-collapsed svg.svg-icon {
   transform: rotate(-90deg);
 }
 
-.sidebar-section-body {
+.tree-item-children {
   overflow: hidden;
+  padding-inline-start: var(--nav-item-children-padding-start);
+  margin-inline-start: var(--nav-item-children-margin-start);
 }
-.sidebar-section-body.is-collapsed {
+.tree-item-children.is-collapsed {
   display: none;
 }
 
@@ -724,14 +796,15 @@ body, body * { scrollbar-width: thin; scrollbar-color: var(--color-scrollbar) tr
 /* ============================================================
    SIDEBAR
    ============================================================ */
+/* Obsidian: .workspace-split.mod-left-split */
 .sidebar {
   width: 215px;
   flex-shrink: 0;
-  background-color: var(--color-bg-sidebar);
-  border-right: 2px solid var(--color-separator);
+  background-color: var(--background-secondary);
+  border-right: var(--divider-width) solid var(--divider-color);
   display: flex;
   flex-direction: column;
-  padding: 0;
+  padding: 0 var(--size-4-2);
   height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
@@ -1265,35 +1338,8 @@ body, body * { scrollbar-width: thin; scrollbar-color: var(--color-scrollbar) tr
   background: var(--color-btn-active);
 }
 
-.btn-theme {
-  background: var(--color-btn);
-  border: 1px solid var(--color-btn-border);
-  color: var(--color-text-primary);
-  width: 24px; height: 22px;
-  border-radius: var(--radius-md);
-  font-size: 12px;
-  display: flex; align-items: center; justify-content: center;
-  transition: background 0.12s;
-}
-.btn-theme:hover {
-  background: var(--color-btn-hover);
-}
-/* テーマ切替は Lucide の sun / moon を app.js が差し替える（旧 --icon-theme 廃止） */
-
-/* Menubar tool link (e.g. スマホ表示プレビュー) — matches .btn-theme box */
-.btn-menubar-tool {
-  background: var(--color-btn);
-  border: 1px solid var(--color-btn-border);
-  color: var(--color-text-primary);
-  width: 24px; height: 22px;
-  border-radius: var(--radius-md);
-  font-size: 12px;
-  line-height: 1;
-  text-decoration: none;
-  display: flex; align-items: center; justify-content: center;
-  transition: background 0.12s;
-}
-.btn-menubar-tool:hover { background: var(--color-btn-hover); }
+/* テーマ切替とスマホプレビューはリボンへ移り、.clickable-icon が描く。
+   旧 .btn-theme / .btn-menubar-tool と --icon-theme は Phase 3 で廃止。 */
 
 /* ============================================================
    CALENDAR GRID (Viewport-style)
@@ -1552,15 +1598,23 @@ body, body * { scrollbar-width: thin; scrollbar-color: var(--color-scrollbar) tr
 /* ============================================================
    OVERLAYS / MODALS
    ============================================================ */
+/* Obsidian: .modal-container が位置決め、.modal-bg が背景の暗幕。
+   背景色をコンテナではなく .modal-bg に持たせるのが Obsidian の構造。 */
 .overlay {
   display: none;
   position: fixed;
   inset: 0;
-  background-color: var(--color-overlay);
-  z-index: 200;
+  z-index: var(--layer-modal);
   align-items: flex-start;
   justify-content: center;
   padding-top: 7vh;
+}
+.modal-bg {
+  position: absolute;
+  inset: 0;
+  background-color: var(--background-modifier-cover);
+  -webkit-backdrop-filter: blur(var(--blur-radius-s, 6px));
+  backdrop-filter: blur(var(--blur-radius-s, 6px));
 }
 .overlay.is-open { display: flex; }
 
@@ -1568,17 +1622,19 @@ body, body * { scrollbar-width: thin; scrollbar-color: var(--color-scrollbar) tr
 #js-edit-overlay { z-index: 300; }
 
 .modal {
-  background-color: var(--color-bg-panel);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--color-border-panel);
-  box-shadow: 0 12px 40px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.3);
+  background-color: var(--modal-background);
+  border-radius: var(--modal-radius);
+  border: var(--modal-border-width) solid var(--modal-border-color);
+  box-shadow: var(--shadow-l);
   width: 100%;
   max-width: 460px;
-  max-height: 84vh;
+  max-height: var(--dialog-max-height);
   display: flex;
   flex-direction: column;
   animation: modalPop 0.12s ease;
   transition: background-color 0.25s;
+  position: relative;   /* .modal-bg より前面に */
+  z-index: 1;
 }
 .modal.modal-sm { max-width: 400px; }
 
@@ -1609,19 +1665,20 @@ body, body * { scrollbar-width: thin; scrollbar-color: var(--color-scrollbar) tr
 .modal-header-title { font-size: 11px; font-weight: 700; color: var(--color-text-secondary); letter-spacing: 0.05em; text-transform: uppercase; }
 .modal-header-sub   { font-size: 10px; color: var(--color-text-disabled); margin-top: 0; display: none; }
 
+/* Obsidian: .modal-close-button — 枠なしの clickable-icon 相当 */
 .modal-close-btn {
-  background: var(--color-btn);
-  border: 1px solid var(--color-btn-border);
-  color: var(--color-text-secondary);
+  background: transparent;
+  border: none;
+  color: var(--icon-color);
   width: 20px; height: 20px;
   min-width: 20px; min-height: 20px;
   display: flex; align-items: center; justify-content: center;
-  border-radius: var(--radius-sm);
-  font-size: 11px;
+  border-radius: var(--clickable-icon-radius);
   flex-shrink: 0;
-  cursor: pointer;
+  cursor: var(--cursor);
   position: relative;
   z-index: 10;
+  --icon-size: var(--icon-xs);
   -webkit-tap-highlight-color: transparent;
   transition: background 0.12s, color 0.12s;
 }
@@ -2205,30 +2262,8 @@ body, body * { scrollbar-width: thin; scrollbar-color: var(--color-scrollbar) tr
    ============================================================ */
 
 /* chips in shift form */
-.template-chip-list { display: flex; flex-wrap: wrap; gap: 6px; }
 
-.template-chip {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 10px;
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--color-border-soft);
-  cursor: pointer;
-  font-size: 11.5px;
-  font-weight: 500;
-  color: var(--color-text-primary);
-  transition: border-color 0.12s, background-color 0.12s, color 0.12s;
-  user-select: none;
-  white-space: nowrap;
-}
-.template-chip:hover { border-color: var(--color-accent); color: var(--color-accent); }
 
-.template-chip-dot {
-  width: 6px; height: 6px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
 
 /* weekday picker chips (repeat / copy modal) */
 .dow-chip-list { display: flex; gap: 6px; flex-wrap: nowrap; }
@@ -2249,53 +2284,12 @@ body, body * { scrollbar-width: thin; scrollbar-color: var(--color-scrollbar) tr
 .repeat-count { margin-top: 12px; font-size: 13px; color: var(--color-text-secondary); text-align: center; }
 
 /* template editor rows inside cat editor */
-.tpl-section {
-  padding: 6px 0 4px 30px;  /* indent under swatch */
-  display: none;
-  animation: fadeSlide 0.15s ease;
-}
-.tpl-section.is-visible { display: block; }
 
-.tpl-section-label {
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--color-text-secondary);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  margin-bottom: 5px;
-}
 
-.tpl-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 5px;
-}
 
-.tpl-input {
-  width: 72px;
-  background-color: var(--color-bg-hover);
-  border: 1.5px solid transparent;
-  border-radius: var(--radius-md);
-  color: var(--color-text-primary);
-  padding: 3px 6px;
-  font-size: 11px;
-  font-family: var(--font-monospace);
-  outline: none;
-  transition: border-color 0.12s;
-}
-.tpl-input:focus { border-color: var(--color-accent); }
 
-.tpl-sep { font-size: 11px; color: var(--color-text-secondary); flex-shrink: 0; }
 
-.tpl-break-input {
-  width: 50px;
-}
 
-.tpl-title-input {
-  width: 110px;
-  flex-shrink: 1;
-}
 
 .tpl-delete-btn {
   background: none;
@@ -2647,15 +2641,16 @@ body, body * { scrollbar-width: thin; scrollbar-color: var(--color-scrollbar) tr
   }
 
   /* Layout: stack vertically, full width */
-  .layout { flex-direction: column; overflow: hidden; }
+  .workspace { flex-direction: column; overflow: hidden; }
   /* .main は Properties (peek 44 / mid 180、position:fixed) + 下部ナビ 56 分の
-     余白を確保。Properties が peek のときは 44px 分だけでよい。 */
+     余白を確保。Properties が peek のときは 44px 分だけでよい。
+     Properties は .main の外（右スプリット）に移ったので、:has は body から見る。 */
   .main {
     width: 100%;
     overflow-y: auto;
     padding-bottom: calc(56px + 180px + env(safe-area-inset-bottom));
   }
-  .main:has(.bottom-panel.is-peek) {
+  body:has(.bottom-panel.is-peek) .main {
     padding-bottom: calc(56px + 44px + env(safe-area-inset-bottom));
   }
   /* タップ可能な月名（タップ＝Today） */
@@ -3191,28 +3186,36 @@ body, body * { scrollbar-width: thin; scrollbar-color: var(--color-scrollbar) tr
 }
 
 /* ============================================================
-   BOTTOM PANEL — TODO + タスク (below calendar)
+   RIGHT SPLIT — 家計簿 / 目標 / タスク
+   Obsidian に下部パネルは無いので、DOM は右サイドバー (.mod-right-split) に
+   一本化した。>720px は右カラム、≤720px は下シート（下の @media で position:
+   fixed に切り替わる）。クラス名 .bottom-panel は JS が参照するため残す。
    ============================================================ */
 .bottom-panel {
-  border-top: 2px solid var(--color-separator);
-  background-color: var(--color-bg-base);
+  border-left: var(--divider-width) solid var(--divider-color);
+  background-color: var(--background-secondary);
   padding: 0;
-  transition: background-color 0.25s, border-color 0.25s, height 0.3s ease;
+  transition: background-color 0.25s, border-color 0.25s, width 0.3s ease;
   flex-shrink: 0;
-  height: 220px;
+  width: 300px;
+  min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
-/* Desktop resize handle (top edge) */
+/* Desktop resize handle (left edge) */
 .bottom-panel::before {
   content: '';
   display: block;
-  height: 6px;
-  margin-top: -3px;
-  cursor: ns-resize;
+  width: 6px;
+  margin-left: -3px;
+  cursor: ew-resize;
   flex-shrink: 0;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 1;
 }
 .bottom-panel.is-resizing {
   transition: none;
@@ -3755,11 +3758,15 @@ body, body * { scrollbar-width: thin; scrollbar-color: var(--color-scrollbar) tr
   .bottom-panel::before { display: none; }
   /* mid（従来）= 180px、peek = ハンドル+タブのみ、is-expanded = 100dvh。
      position:fixed で下部ナビの真上に固定（.main の flow/padding 頼みだと
-     iOS standalone(ホーム画面追加) でスクロール位置依存になり被ることがある）。 */
+     iOS standalone(ホーム画面追加) でスクロール位置依存になり被ることがある）。
+     デスクトップでは右カラム (width:300px) なので、ここで幅の指定を打ち消して
+     全幅の下シートに戻す＝「開く向きだけ変える」。 */
   .bottom-panel {
     position: fixed;
     left: 0;
     right: 0;
+    width: auto;
+    border-left: none;
     height: 180px;
     z-index: 40;
   }

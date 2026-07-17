@@ -356,7 +356,7 @@ document.getElementById('js-notif-btn')?.addEventListener('click', async () => {
 document.getElementById('js-ios-guide-close')?.addEventListener('click', () => closeOverlay('js-ios-guide-overlay'));
 document.getElementById('js-ios-guide-ok')?.addEventListener('click', () => closeOverlay('js-ios-guide-overlay'));
 document.getElementById('js-ios-guide-overlay')?.addEventListener('click', e => {
-  if (e.target === document.getElementById('js-ios-guide-overlay')) closeOverlay('js-ios-guide-overlay');
+  if (_isBackdropClick(e, 'js-ios-guide-overlay')) closeOverlay('js-ios-guide-overlay');
 });
 
 // ログイン後に呼ぶ：許可済みなら Push 購読を更新し、当日分チェック
@@ -539,17 +539,21 @@ function monthlySalaryToDate() {
 
 // ── Sync indicator ────────────────────────────────────────────────────────────
 
+// Obsidian は同期状態をステータスバーに出す。旧メニューバーの
+// #js-sync-indicator と #js-status-sync は同じ状態の二重表示だったので統合した。
+const _SYNC_UI = {
+  syncing: { icon: 'refresh-cw',      label: '同期中',   title: '同期中...' },
+  synced:  { icon: 'calendar-check',  label: '同期済み', title: '同期済み' },
+  error:   { icon: 'alert-triangle',  label: 'エラー',   title: '同期エラー' },
+};
+
 function setSyncStatus(status) { // 'syncing' | 'synced' | 'error'
-  const el = document.getElementById('js-sync-indicator');
-  if (el) {
-    el.className = 'sync-indicator ' + status;
-    el.title = status === 'syncing' ? '同期中...' : status === 'synced' ? '同期済み' : '同期エラー';
-  }
-  const elStatus = document.getElementById('js-status-sync');
-  if (elStatus) {
-    elStatus.textContent = status === 'syncing' ? '⟳ 同期中' : status === 'synced' ? '✓ 同期済み' : '✕ エラー';
-    elStatus.style.color = status === 'error' ? 'var(--color-danger)' : status === 'synced' ? 'var(--color-positive)' : '';
-  }
+  const el = document.getElementById('js-status-sync');
+  if (!el) return;
+  const ui = _SYNC_UI[status] || _SYNC_UI.error;
+  el.className = 'status-bar-item mod-clickable sync-indicator ' + status;
+  el.title = ui.title;
+  el.innerHTML = `<svg class="svg-icon"><use href="#lucide-${ui.icon}"/></svg><span>${ui.label}</span>`;
 }
 
 // ── Supabase: load data ───────────────────────────────────────────────────────
@@ -995,6 +999,9 @@ async function moveEventToDate(dbId, srcKey, destKey) {
 function applyTheme(dark) {
   document.body.classList.toggle('theme-dark', dark);
   document.body.classList.toggle('theme-light', !dark);
+  // リボンのアイコンは「切り替えた先」を示す（ダーク中は sun＝明るくする）。
+  document.querySelector('#js-theme-toggle .svg-icon use')
+    ?.setAttribute('href', dark ? '#lucide-sun' : '#lucide-moon');
 }
 function toggleTheme() {
   isDark = !isDark; applyTheme(isDark); saveLocalJSON('cal_dark', isDark);
@@ -1002,10 +1009,14 @@ function toggleTheme() {
 
 // Obsidian はプラットフォームも <body> のクラスで示す（is-mobile / is-phone）。
 // 幅の判定は isNarrowScreen() と同じ 720px に揃える。
+// リボンの表示も Obsidian と同じ show-ribbon 機構で畳む
+// （body:not(.show-ribbon) が --ribbon-width を 0 にする）。モバイルはリボンを
+// 持たず、ハンバーガー＋ドロワーで代替する。
 function applyPlatformClass() {
   const narrow = isNarrowScreen();
   document.body.classList.toggle('is-mobile', narrow);
   document.body.classList.toggle('is-phone', narrow);
+  document.body.classList.toggle('show-ribbon', !narrow);
 }
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
@@ -1381,6 +1392,9 @@ function mkMini(day,isOther,isToday,hasEv,isSun,isSat,hasGoalDone) {
 
 function renderMain() {
   const y=curDate.getFullYear(), m=curDate.getMonth(), today=new Date();
+  // I3: 1描画につき1回だけ評価する。ピルごとに呼ぶと 1 描画で 100 回超の
+  // matchMedia 評価＝レイアウトスラッシュになる。
+  const narrow=isNarrowScreen();
   document.getElementById('js-topbar-title').textContent=`${MONTHS_INIT[m]} ${y}`;
   document.getElementById('js-topbar-sub').textContent='';
 
@@ -1390,16 +1404,16 @@ function renderMain() {
 
   for (let i=first-1;i>=0;i--) {
     const dt=new Date(y,m-1,prev-i);
-    grid.appendChild(buildCell(dt.getFullYear(),dt.getMonth(),dt.getDate(),true,false));
+    grid.appendChild(buildCell(dt.getFullYear(),dt.getMonth(),dt.getDate(),true,false,narrow));
   }
   for (let d=1;d<=dim;d++) {
     const isTd=y===today.getFullYear()&&m===today.getMonth()&&d===today.getDate();
-    grid.appendChild(buildCell(y,m,d,false,isTd));
+    grid.appendChild(buildCell(y,m,d,false,isTd,narrow));
   }
   const rem=grid.children.length%7;
   if (rem) for (let d=1;d<=7-rem;d++) {
     const dt=new Date(y,m+1,d);
-    grid.appendChild(buildCell(dt.getFullYear(),dt.getMonth(),d,true,false));
+    grid.appendChild(buildCell(dt.getFullYear(),dt.getMonth(),d,true,false,narrow));
   }
 }
 
@@ -1407,7 +1421,10 @@ function sortEvs(arr) {
   return [...arr].sort((a,b)=>(a.shiftStart||a.time||'99:99').localeCompare(b.shiftStart||b.time||'99:99'));
 }
 
-function buildCell(y,m,d,isOther,isToday) {
+// narrow は renderMain が1度だけ評価して渡す（I3）。単体で呼ばれた場合に備えて
+// 省略時は自分で評価する。
+function buildCell(y,m,d,isOther,isToday,narrow) {
+  if (narrow === undefined) narrow = isNarrowScreen();
   const dow=new Date(y,m,d).getDay(), key=dateKey(y,m,d), dayEvs=sortEvs(events[key]||[]);
   const cell=document.createElement('div');
   cell.className=['day-cell',isOther?'is-other-month':'',isToday?'is-today':'',
@@ -1448,14 +1465,14 @@ function buildCell(y,m,d,isOther,isToday) {
       pill.className='event-pill'+(isShift(ev.catId)?' is-shift':'');
       pill.style.background=cat.color;
       if (isShift(ev.catId)&&ev.shiftStart) {
-        if (isNarrowScreen()) {
+        if (narrow) {
           // 2段表示：1段目に開始時刻、2段目にカテゴリ名
           pill.innerHTML=`<span class="event-pill-time">${ev.shiftStart}</span><span class="event-pill-name">${escHtml(cat.name)}</span>`;
         } else {
           pill.innerHTML=`<span class="event-pill-time">${ev.shiftStart}–${ev.shiftEnd}</span><span class="event-pill-name">${escHtml(cat.name)}</span>`;
         }
       } else {
-        if (isNarrowScreen()) {
+        if (narrow) {
           // 2段表示：1段目に開始時刻、2段目に予定タイトル（終日は時刻なしで名前のみ）
           pill.innerHTML= ev.time
             ? `<span class="event-pill-time">${ev.time}</span><span class="event-pill-name">${escHtml(ev.title)}</span>`
@@ -1874,7 +1891,7 @@ function closeEditModal() {
 document.getElementById('js-edit-modal-close').addEventListener('click', closeEditModal);
 document.getElementById('js-edit-cancel-btn').addEventListener('click',  closeEditModal);
 document.getElementById('js-edit-overlay').addEventListener('click', e => {
-  if (e.target === document.getElementById('js-edit-overlay')) closeEditModal();
+  if (_isBackdropClick(e, 'js-edit-overlay')) closeEditModal();
 });
 
 // Also close edit modal on Escape (extend existing keydown handler below)
@@ -2160,7 +2177,7 @@ function closeRepeatPicker(){ closeOverlay('js-repeat-overlay'); _repeatSrcEv = 
 document.getElementById('js-repeat-modal-close').addEventListener('click', closeRepeatPicker);
 document.getElementById('js-repeat-cancel-btn').addEventListener('click', closeRepeatPicker);
 document.getElementById('js-repeat-overlay').addEventListener('click', e => {
-  if (e.target === document.getElementById('js-repeat-overlay')) closeRepeatPicker();
+  if (_isBackdropClick(e, 'js-repeat-overlay')) closeRepeatPicker();
 });
 
 // 導線① 予定タブ：曜日を指定して追加
@@ -2668,6 +2685,15 @@ function _getTopOpenOverlay() {
   return overlays.length ? overlays[overlays.length - 1] : null;
 }
 
+// 背景クリック判定。Obsidian 構造では .modal-container の中に .modal-bg が
+// 敷かれるので、背景を踏んだクリックの target は .modal-bg になり、
+// 素朴な `e.target === overlay` では二度と真にならない。
+function _isBackdropClick(e, overlayId) {
+  const ov = document.getElementById(overlayId);
+  if (!ov) return false;
+  return e.target === ov || (e.target.classList.contains('modal-bg') && e.target.parentElement === ov);
+}
+
 function openOverlay(id){
   const el = document.getElementById(id);
   if (!el || el.classList.contains('is-open')) return;
@@ -2706,7 +2732,7 @@ function appConfirm(message, okLabel){
     }
     const onOk = ()=>cleanup(true);
     const onCancel = ()=>cleanup(false);
-    const onBackdrop = (e)=>{ if (e.target === ov) cleanup(false); };
+    const onBackdrop = (e)=>{ if (e.target === ov || (e.target.classList.contains('modal-bg') && e.target.parentElement === ov)) cleanup(false); };
     ok.addEventListener('click', onOk);
     cancel.addEventListener('click', onCancel);
     ov.addEventListener('click', onBackdrop);
@@ -2966,6 +2992,17 @@ function renderAll(){
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 
+// ── Ribbon (Obsidian: global actions only) ───────────────────────────────────
+document.getElementById('js-ribbon-sidebar')?.addEventListener('click', () => {
+  document.getElementById('js-sidebar-toggle')?.click();
+});
+document.getElementById('js-ribbon-today')?.addEventListener('click', () => {
+  document.getElementById('js-today')?.click();
+});
+document.getElementById('js-ribbon-timer')?.addEventListener('click', () => {
+  document.getElementById('js-mbb-timer')?.click();
+});
+
 applyTheme(isDark);
 applyPlatformClass();
 // MediaQueryList は参照を保持する。捨てると実装によっては GC され、
@@ -3183,16 +3220,22 @@ document.addEventListener('touchend', e => {
   _lastTouchEnd = now;
 }, { passive: false });
 
-// ── Sidebar section toggle (Blender-style collapsible panels) ────────────────
+// ── Sidebar section toggle (Obsidian: .tree-item / .collapse-icon) ───────────
+// Obsidian marks the collapsed state with .is-collapsed on the collapse-icon and
+// rotates the chevron -90°; there is no .is-open in its vocabulary.
 document.querySelectorAll('.sidebar-section-toggle').forEach(btn => {
-  btn.addEventListener('click', () => {
+  const toggle = () => {
     const body = btn.nextElementSibling;
-    const chevron = btn.querySelector('.section-chevron');
+    const chevron = btn.querySelector('.collapse-icon');
     if (!body) return;
     const isCollapsed = body.classList.toggle('is-collapsed');
-    if (chevron) {
-      chevron.classList.toggle('is-open', !isCollapsed);
-    }
+    btn.closest('.tree-item')?.classList.toggle('is-collapsed', isCollapsed);
+    chevron?.classList.toggle('is-collapsed', isCollapsed);
+  };
+  btn.addEventListener('click', toggle);
+  // .tree-item-self is a div, not a button — restore keyboard activation.
+  btn.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
   });
 });
 
@@ -3213,7 +3256,11 @@ function switchView(view) {
   document.getElementById('js-month-view').style.display = view === 'month' ? '' : 'none';
   document.getElementById('js-week-view').style.display  = view === 'week'  ? '' : 'none';
   document.getElementById('js-day-view').style.display   = view === 'day'   ? '' : 'none';
-  document.querySelectorAll('.workspace-tab').forEach(b => b.classList.toggle('is-active', b.dataset.view === view));
+  document.querySelectorAll('.workspace-tab-header[data-view]').forEach(b => {
+    const on = b.dataset.view === view;
+    b.classList.toggle('is-active', on);
+    b.setAttribute('aria-selected', String(on));
+  });
   document.querySelectorAll('.mbb-btn[data-view]').forEach(b => b.classList.toggle('is-active', b.dataset.view === view));
   updateStatusBar();
   if (view === 'day') {
@@ -5610,14 +5657,14 @@ document.getElementById('js-jcb-btn')?.addEventListener('click', function() {
 document.getElementById('js-jcb-close')?.addEventListener('click', function() { closeOverlay('js-jcb-overlay'); });
 document.getElementById('js-jcb-ok')?.addEventListener('click', function() { closeOverlay('js-jcb-overlay'); });
 document.getElementById('js-jcb-overlay')?.addEventListener('click', function(e) {
-  if (e.target === document.getElementById('js-jcb-overlay')) closeOverlay('js-jcb-overlay');
+  if (_isBackdropClick(e, 'js-jcb-overlay')) closeOverlay('js-jcb-overlay');
 });
 
 document.getElementById('js-receipt-modal-close').addEventListener('click', function() {
   closeOverlay('js-receipt-overlay');
 });
 document.getElementById('js-receipt-overlay').addEventListener('click', function(e) {
-  if (e.target === document.getElementById('js-receipt-overlay')) closeOverlay('js-receipt-overlay');
+  if (_isBackdropClick(e, 'js-receipt-overlay')) closeOverlay('js-receipt-overlay');
 });
 
 // ── File input / drop zone ──
@@ -5912,7 +5959,7 @@ document.getElementById('js-daily-plan-btn').addEventListener('click', openDaily
 document.getElementById('js-daily-plan-close').addEventListener('click', () => closeOverlay('js-daily-plan-overlay'));
 document.getElementById('js-daily-plan-cancel').addEventListener('click', () => closeOverlay('js-daily-plan-overlay'));
 document.getElementById('js-daily-plan-overlay').addEventListener('click', e => {
-  if (e.target === document.getElementById('js-daily-plan-overlay')) closeOverlay('js-daily-plan-overlay');
+  if (_isBackdropClick(e, 'js-daily-plan-overlay')) closeOverlay('js-daily-plan-overlay');
 });
 
 document.getElementById('js-daily-plan-save').addEventListener('click', async () => {

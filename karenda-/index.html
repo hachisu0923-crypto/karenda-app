@@ -111,51 +111,52 @@
 <div id="js-app" style="display:none">
 <div class="app-shell">
 
-<!-- ═══ BLENDER TOP MENU BAR ═══ -->
-<div class="blender-menubar">
-  <div class="blender-menubar-left">
-    <div class="blender-logo"><svg class="svg-icon"><use href="#lucide-calendar-days"/></svg></div>
-    <span class="blender-app-name">My Calendar</span>
-    <span class="blender-menubar-sep"></span>
-    <span class="sync-indicator" id="js-sync-indicator" title="同期状態"></span>
-  </div>
-  <div class="blender-workspace-tabs">
-    <button class="workspace-tab is-active" id="js-tab-month" data-view="month">
-      <svg class="workspace-tab-icon" viewBox="0 0 16 16" width="14" height="14"><rect x="1" y="2" width="14" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/><line x1="1" y1="5.5" x2="15" y2="5.5" stroke="currentColor" stroke-width="1"/><line x1="5" y1="5.5" x2="5" y2="14" stroke="currentColor" stroke-width="0.6" opacity="0.4"/><line x1="8" y1="5.5" x2="8" y2="14" stroke="currentColor" stroke-width="0.6" opacity="0.4"/><line x1="11" y1="5.5" x2="11" y2="14" stroke="currentColor" stroke-width="0.6" opacity="0.4"/></svg>
-      Month
+<!-- ═══ RIBBON ═══
+     Obsidian の左端の縦アイコン列。グローバル動作専用（設定・パネル開閉など）で、
+     「同じデータの見え方の切替」は入れない。Month/Week/Day はタブへ。
+     モバイルでは body から show-ribbon が外れて畳まれる（Obsidian と同じ仕組み）。 -->
+<div class="workspace-ribbon mod-left">
+  <div class="side-dock-actions">
+    <button class="clickable-icon" id="js-ribbon-sidebar" aria-label="サイドバーを開閉">
+      <svg class="svg-icon"><use href="#lucide-menu"/></svg>
     </button>
-    <button class="workspace-tab" id="js-tab-week" data-view="week">
-      <svg class="workspace-tab-icon" viewBox="0 0 16 16" width="14" height="14"><rect x="1" y="2" width="14" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/><line x1="1" y1="5.5" x2="15" y2="5.5" stroke="currentColor" stroke-width="1"/><line x1="3.3" y1="2" x2="3.3" y2="14" stroke="currentColor" stroke-width="0.6" opacity="0.5"/><line x1="5.6" y1="2" x2="5.6" y2="14" stroke="currentColor" stroke-width="0.6" opacity="0.5"/><line x1="8" y1="2" x2="8" y2="14" stroke="currentColor" stroke-width="0.6" opacity="0.5"/><line x1="10.4" y1="2" x2="10.4" y2="14" stroke="currentColor" stroke-width="0.6" opacity="0.5"/><line x1="12.7" y1="2" x2="12.7" y2="14" stroke="currentColor" stroke-width="0.6" opacity="0.5"/></svg>
-      Week
+    <button class="clickable-icon" id="js-ribbon-today" aria-label="今日へ">
+      <svg class="svg-icon"><use href="#lucide-calendar-check"/></svg>
     </button>
-    <button class="workspace-tab" id="js-tab-day" data-view="day">
-      <svg class="workspace-tab-icon" viewBox="0 0 16 16" width="14" height="14"><rect x="3" y="2" width="10" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/><line x1="3" y1="5.5" x2="13" y2="5.5" stroke="currentColor" stroke-width="1"/><line x1="5" y1="7.5" x2="11" y2="7.5" stroke="currentColor" stroke-width="0.5" opacity="0.3"/><line x1="5" y1="9.5" x2="11" y2="9.5" stroke="currentColor" stroke-width="0.5" opacity="0.3"/><line x1="5" y1="11.5" x2="11" y2="11.5" stroke="currentColor" stroke-width="0.5" opacity="0.3"/></svg>
-      Day
+    <button class="clickable-icon" id="js-ribbon-timer" aria-label="タイマー">
+      <svg class="svg-icon"><use href="#lucide-timer"/></svg>
     </button>
   </div>
-  <div class="blender-menubar-right">
-    <a class="btn-menubar-tool" href="./mobile-preview.html" target="_blank" rel="noopener" title="スマホ表示プレビュー"><svg class="svg-icon"><use href="#lucide-smartphone"/></svg></a>
-    <button class="btn-theme" id="js-theme-toggle" title="テーマ切替"></button>
+  <div class="side-dock-actions mod-bottom">
+    <a class="clickable-icon" href="./mobile-preview.html" target="_blank" rel="noopener" aria-label="スマホ表示プレビュー">
+      <svg class="svg-icon"><use href="#lucide-smartphone"/></svg>
+    </a>
+    <button class="clickable-icon" id="js-theme-toggle" aria-label="テーマ切替">
+      <svg class="svg-icon"><use href="#lucide-moon"/></svg>
+    </button>
   </div>
 </div>
 
-<div class="layout">
+<div class="workspace">
 
-  <!-- ═══ SIDEBAR (Outliner Panel) ═══ -->
+  <!-- ═══ LEFT SPLIT (Obsidian: mod-left-split) ═══ -->
   <div class="sidebar-overlay" id="js-sidebar-overlay"></div>
-  <aside class="sidebar">
-    <div class="blender-panel-header">
-      <span class="panel-grip"></span>
-      <svg class="panel-icon" viewBox="0 0 16 16" width="14" height="14"><circle cx="4" cy="4" r="1.5" fill="currentColor"/><line x1="7" y1="4" x2="14" y2="4" stroke="currentColor" stroke-width="1.2"/><circle cx="4" cy="8" r="1.5" fill="currentColor"/><line x1="7" y1="8" x2="14" y2="8" stroke="currentColor" stroke-width="1.2"/><circle cx="4" cy="12" r="1.5" fill="currentColor"/><line x1="7" y1="12" x2="14" y2="12" stroke="currentColor" stroke-width="1.2"/></svg>
-      <span class="panel-header-title">Outliner</span>
+  <aside class="workspace-split mod-horizontal mod-left-split sidebar">
+    <div class="nav-header">
+      <div class="nav-buttons-container">
+        <svg class="svg-icon"><use href="#lucide-list-tree"/></svg>
+        <span class="nav-header-title">カレンダー</span>
+      </div>
     </div>
 
-    <div class="sidebar-section" id="js-section-minical">
-      <button class="sidebar-section-toggle" data-section="minical">
-        <span class="section-chevron is-open">▼</span>
-        <span class="sidebar-section-label">ミニカレンダー</span>
-      </button>
-      <div class="sidebar-section-body">
+    <div class="tree-item sidebar-section" id="js-section-minical">
+      <div class="tree-item-self is-clickable mod-collapsible sidebar-section-toggle" data-section="minical" role="button" tabindex="0">
+        <div class="tree-item-icon collapse-icon section-chevron is-open">
+          <svg class="svg-icon"><use href="#lucide-chevron-down"/></svg>
+        </div>
+        <div class="tree-item-inner sidebar-section-label">ミニカレンダー</div>
+      </div>
+      <div class="tree-item-children sidebar-section-body">
         <div class="mini-cal">
           <div class="mini-cal-header">
             <button class="mini-nav-btn" id="js-mini-prev">‹</button>
@@ -179,12 +180,14 @@
       <div class="bgm-player" id="js-bgm-player" hidden></div>
     </div>
 
-    <div class="sidebar-section" id="js-section-categories">
-      <button class="sidebar-section-toggle" data-section="categories">
-        <span class="section-chevron is-open">▼</span>
-        <span class="sidebar-section-label">カテゴリ</span>
-      </button>
-      <div class="sidebar-section-body">
+    <div class="tree-item sidebar-section" id="js-section-categories">
+      <div class="tree-item-self is-clickable mod-collapsible sidebar-section-toggle" data-section="categories" role="button" tabindex="0">
+        <div class="tree-item-icon collapse-icon section-chevron is-open">
+          <svg class="svg-icon"><use href="#lucide-chevron-down"/></svg>
+        </div>
+        <div class="tree-item-inner sidebar-section-label">カテゴリ</div>
+      </div>
+      <div class="tree-item-children sidebar-section-body">
         <div class="category-list" id="js-category-list"></div>
         <button class="sidebar-btn" id="js-open-cat-editor">
           <span style="font-size:16px;line-height:1">+</span>
@@ -193,22 +196,26 @@
       </div>
     </div>
 
-    <div class="sidebar-section" id="js-section-salary">
-      <button class="sidebar-section-toggle" data-section="salary">
-        <span class="section-chevron is-open">▼</span>
-        <span class="sidebar-section-label">今月の給料</span>
-      </button>
-      <div class="sidebar-section-body">
+    <div class="tree-item sidebar-section" id="js-section-salary">
+      <div class="tree-item-self is-clickable mod-collapsible sidebar-section-toggle" data-section="salary" role="button" tabindex="0">
+        <div class="tree-item-icon collapse-icon section-chevron is-open">
+          <svg class="svg-icon"><use href="#lucide-chevron-down"/></svg>
+        </div>
+        <div class="tree-item-inner sidebar-section-label">今月の給料</div>
+      </div>
+      <div class="tree-item-children sidebar-section-body">
         <div class="salary-summary" id="js-salary-summary"></div>
       </div>
     </div>
 
-    <div class="sidebar-section" id="js-section-clean">
-      <button class="sidebar-section-toggle" data-section="clean">
-        <span class="section-chevron is-open">▼</span>
-        <span class="sidebar-section-label">クリーンカレンダー</span>
-      </button>
-      <div class="sidebar-section-body">
+    <div class="tree-item sidebar-section" id="js-section-clean">
+      <div class="tree-item-self is-clickable mod-collapsible sidebar-section-toggle" data-section="clean" role="button" tabindex="0">
+        <div class="tree-item-icon collapse-icon section-chevron is-open">
+          <svg class="svg-icon"><use href="#lucide-chevron-down"/></svg>
+        </div>
+        <div class="tree-item-inner sidebar-section-label">クリーンカレンダー</div>
+      </div>
+      <div class="tree-item-children sidebar-section-body">
         <div class="clean-cal" id="js-clean-cal"></div>
       </div>
     </div>
@@ -232,24 +239,55 @@
   <!-- Visual hint for left-edge swipe (mobile only, hidden when sidebar open) -->
   <div class="edge-swipe-hint" id="js-edge-swipe-hint" aria-hidden="true"></div>
 
-  <!-- ═══ MAIN (Viewport Panel) ═══ -->
-  <div class="main">
-    <div class="blender-panel-header viewport-header">
-      <button class="sidebar-toggle" id="js-sidebar-toggle" aria-label="メニュー">
-        <svg viewBox="0 0 18 18" width="18" height="18"><line x1="2" y1="4" x2="16" y2="4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><line x1="2" y1="9" x2="16" y2="9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><line x1="2" y1="14" x2="16" y2="14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+  <!-- ═══ ROOT SPLIT (Obsidian: mod-root) ═══ -->
+  <div class="workspace-split mod-vertical mod-root main">
+    <!-- Month/Week/Day は「3つの開いているビュー」＝タブ。Obsidian のリボンは
+         グローバル動作専用なのでここには置かない。閉じられないタブなので、
+         Obsidian に実在する mod-pinned（ピン留めタブ）の様式を使う。 -->
+    <div class="workspace-tab-header-container">
+      <button class="sidebar-toggle clickable-icon" id="js-sidebar-toggle" aria-label="メニュー">
+        <svg class="svg-icon"><use href="#lucide-menu"/></svg>
       </button>
-      <span class="panel-grip"></span>
-      <svg class="panel-icon" viewBox="0 0 16 16" width="14" height="14"><rect x="1" y="1" width="14" height="14" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/><line x1="1" y1="8" x2="15" y2="8" stroke="currentColor" stroke-width="0.6" opacity="0.3"/><line x1="8" y1="1" x2="8" y2="15" stroke="currentColor" stroke-width="0.6" opacity="0.3"/><circle cx="8" cy="8" r="2" fill="none" stroke="currentColor" stroke-width="1" opacity="0.5"/></svg>
-      <span class="panel-header-title">Calendar Viewport</span>
-      <span class="panel-header-sep"></span>
-      <div class="topbar-nav">
-        <button class="btn-icon" id="js-prev-month">‹</button>
-        <button class="btn-text" id="js-today">Today</button>
-        <button class="btn-icon" id="js-next-month">›</button>
+      <div class="workspace-tab-header-container-inner">
+        <div class="workspace-tab-header is-active mod-pinned" id="js-tab-month" data-view="month" role="tab" aria-selected="true">
+          <div class="workspace-tab-header-inner">
+            <div class="workspace-tab-header-inner-icon"><svg class="svg-icon"><use href="#lucide-calendar-days"/></svg></div>
+            <div class="workspace-tab-header-inner-title">Month</div>
+            <div class="workspace-tab-header-status-container">
+              <div class="workspace-tab-header-status-icon"><svg class="svg-icon"><use href="#lucide-pin"/></svg></div>
+            </div>
+          </div>
+        </div>
+        <div class="workspace-tab-header mod-pinned" id="js-tab-week" data-view="week" role="tab" aria-selected="false">
+          <div class="workspace-tab-header-inner">
+            <div class="workspace-tab-header-inner-icon"><svg class="svg-icon"><use href="#lucide-calendar-range"/></svg></div>
+            <div class="workspace-tab-header-inner-title">Week</div>
+            <div class="workspace-tab-header-status-container">
+              <div class="workspace-tab-header-status-icon"><svg class="svg-icon"><use href="#lucide-pin"/></svg></div>
+            </div>
+          </div>
+        </div>
+        <div class="workspace-tab-header mod-pinned" id="js-tab-day" data-view="day" role="tab" aria-selected="false">
+          <div class="workspace-tab-header-inner">
+            <div class="workspace-tab-header-inner-icon"><svg class="svg-icon"><use href="#lucide-calendar-clock"/></svg></div>
+            <div class="workspace-tab-header-inner-title">Day</div>
+            <div class="workspace-tab-header-status-container">
+              <div class="workspace-tab-header-status-icon"><svg class="svg-icon"><use href="#lucide-pin"/></svg></div>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="topbar-title-group">
-        <div class="topbar-title" id="js-topbar-title"></div>
-        <div class="topbar-sub" id="js-topbar-sub"></div>
+    </div>
+
+    <div class="view-header viewport-header">
+      <div class="view-header-title-container">
+        <div class="view-header-title topbar-title" id="js-topbar-title"></div>
+        <div class="view-header-title-parent topbar-sub" id="js-topbar-sub"></div>
+      </div>
+      <div class="view-actions topbar-nav">
+        <button class="clickable-icon btn-icon" id="js-prev-month" aria-label="前へ"><svg class="svg-icon"><use href="#lucide-chevron-left"/></svg></button>
+        <button class="clickable-icon btn-text" id="js-today">Today</button>
+        <button class="clickable-icon btn-icon" id="js-next-month" aria-label="次へ"><svg class="svg-icon"><use href="#lucide-chevron-right"/></svg></button>
       </div>
     </div>
 
@@ -305,29 +343,41 @@
       </div>
     </div>
 
-    <!-- ── Bottom panel: 目標 / Task / 家計簿 ── -->
-    <div class="bottom-panel">
-      <div class="bp-swipe-handle"><span class="bp-swipe-bar"></span></div>
-      <div class="blender-panel-header bp-panel-header">
-        <span class="panel-grip"></span>
-        <svg class="panel-icon" viewBox="0 0 16 16" width="14" height="14"><rect x="1" y="1" width="14" height="6" rx="1" fill="currentColor" opacity="0.3"/><line x1="3" y1="10" x2="13" y2="10" stroke="currentColor" stroke-width="1.2"/><line x1="3" y1="13" x2="10" y2="13" stroke="currentColor" stroke-width="1.2"/></svg>
-        <span class="panel-header-title">Properties</span>
-        <span class="panel-header-sep"></span>
-        <div class="bp-tab-bar">
-          <button class="bp-tab is-active" data-bp="budget">
-            <svg viewBox="0 0 12 12" width="11" height="11"><circle cx="6" cy="6" r="4.5" fill="none" stroke="currentColor" stroke-width="1.2"/><line x1="6" y1="3" x2="6" y2="9" stroke="currentColor" stroke-width="1.2"/><line x1="4" y1="4.5" x2="8" y2="4.5" stroke="currentColor" stroke-width="1"/><line x1="4" y1="7.5" x2="8" y2="7.5" stroke="currentColor" stroke-width="1"/></svg>
-            家計簿
-          </button>
-          <button class="bp-tab" data-bp="goal">
-            <svg viewBox="0 0 12 12" width="11" height="11"><circle cx="6" cy="6" r="4.5" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="6" cy="6" r="2" fill="currentColor"/></svg>
-            目標
-          </button>
-          <button class="bp-tab" data-bp="task">
-            <svg viewBox="0 0 12 12" width="11" height="11"><rect x="1" y="2" width="10" height="8" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/><line x1="3" y1="5" x2="9" y2="5" stroke="currentColor" stroke-width="1"/><line x1="3" y1="7.5" x2="7" y2="7.5" stroke="currentColor" stroke-width="1"/></svg>
-            タスク
-          </button>
+  </div><!-- /.mod-root -->
+
+  <!-- ═══ RIGHT SPLIT (Obsidian: mod-right-split) — 家計簿 / 目標 / タスク ═══
+       Obsidian に下部パネルは無いので、DOM は右サイドバーに一本化する。
+       開く向きだけをブレークポイントで変える:
+         >720px  … 右から（Obsidian 忠実）
+         ≤720px  … 下から（意図的な逸脱）
+       ≤720px を右ドロワーにすると .bp-swipe-handle の上スワイプ 3 段階
+       （peek/mid/is-expanded）というモバイルの主要導線が丸ごと消えるため。
+       逸脱は「向き」だけに限定し、背景ぼかし・ドラッグハンドル・上端タブは
+       Obsidian のドロワーの構成要素をそのまま使う。 -->
+  <div class="workspace-split mod-horizontal mod-right-split bottom-panel">
+    <div class="bp-swipe-handle"><span class="bp-swipe-bar"></span></div>
+    <div class="workspace-tab-header-container bp-panel-header">
+      <div class="workspace-tab-header-container-inner bp-tab-bar">
+        <div class="workspace-tab-header is-active bp-tab" data-bp="budget" role="tab" aria-selected="true">
+          <div class="workspace-tab-header-inner">
+            <div class="workspace-tab-header-inner-icon"><svg class="svg-icon"><use href="#lucide-wallet"/></svg></div>
+            <div class="workspace-tab-header-inner-title">家計簿</div>
+          </div>
+        </div>
+        <div class="workspace-tab-header bp-tab" data-bp="goal" role="tab" aria-selected="false">
+          <div class="workspace-tab-header-inner">
+            <div class="workspace-tab-header-inner-icon"><svg class="svg-icon"><use href="#lucide-target"/></svg></div>
+            <div class="workspace-tab-header-inner-title">目標</div>
+          </div>
+        </div>
+        <div class="workspace-tab-header bp-tab" data-bp="task" role="tab" aria-selected="false">
+          <div class="workspace-tab-header-inner">
+            <div class="workspace-tab-header-inner-icon"><svg class="svg-icon"><use href="#lucide-list-checks"/></svg></div>
+            <div class="workspace-tab-header-inner-title">タスク</div>
+          </div>
         </div>
       </div>
+    </div>
 
       <!-- ── Goal (目標) section ── -->
       <div id="js-bp-goal" class="bp-section" style="display:none">
@@ -417,24 +467,20 @@
 
     </div>
 
-  </div>
+  </div><!-- /.mod-right-split -->
 
-</div><!-- /.layout -->
+</div><!-- /.workspace -->
 
-<!-- ═══ STATUS BAR ═══ -->
+<!-- ═══ STATUS BAR ═══
+     Obsidian のステータスバーは右下に寄せた .status-bar-item の並び。
+     区切りの「|」は使わない。旧メニューバーの sync-indicator はここへ統合
+     （#js-status-sync と同じ同期状態の二重表示だった）。 -->
 <div class="status-bar" id="js-status-bar">
-  <div class="status-bar-left">
-    <span class="status-item" id="js-status-view"></span>
-    <span class="status-sep">|</span>
-    <span class="status-item" id="js-status-date"></span>
-    <span class="status-sep">|</span>
-    <span class="status-item" id="js-status-events"></span>
-  </div>
-  <div class="status-bar-right">
-    <span class="status-item" id="js-status-sync"></span>
-    <span class="status-sep">|</span>
-    <span class="status-item">Karenda v1.0</span>
-  </div>
+  <div class="status-bar-item" id="js-status-view"></div>
+  <div class="status-bar-item" id="js-status-date"></div>
+  <div class="status-bar-item" id="js-status-events"></div>
+  <div class="status-bar-item mod-clickable" id="js-status-sync" title="同期状態"></div>
+  <div class="status-bar-item">Karenda v1.0</div>
 </div>
 
 </div><!-- /.app-shell -->
@@ -442,14 +488,15 @@
 
 
 <!-- ═══════════ DAY MODAL ═══════════ -->
-<div class="overlay" id="js-day-overlay">
+<div class="modal-container overlay" id="js-day-overlay">
+  <div class="modal-bg"></div>
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="js-day-modal-title">
     <div class="modal-header">
       <div>
         <div class="modal-header-title" id="js-day-modal-title"></div>
         <div class="modal-header-sub"   id="js-day-modal-sub"></div>
       </div>
-      <button class="modal-close-btn" id="js-day-modal-close" aria-label="閉じる">✕</button>
+      <button class="modal-close-button modal-close-btn" id="js-day-modal-close" aria-label="閉じる"><svg class="svg-icon"><use href="#lucide-x"/></svg></button>
     </div>
     <div class="modal-body">
       <div id="js-existing-events"></div>
@@ -566,14 +613,15 @@
 </div>
 
 <!-- ═══════════ EDIT EVENT MODAL ═══════════ -->
-<div class="overlay" id="js-edit-overlay">
+<div class="modal-container overlay" id="js-edit-overlay">
+  <div class="modal-bg"></div>
   <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="js-edit-modal-title">
     <div class="modal-header">
       <div>
         <div class="modal-header-title" id="js-edit-modal-title">予定を編集</div>
         <div class="modal-header-sub"   id="js-edit-modal-sub"></div>
       </div>
-      <button class="modal-close-btn" id="js-edit-modal-close" aria-label="閉じる">✕</button>
+      <button class="modal-close-button modal-close-btn" id="js-edit-modal-close" aria-label="閉じる"><svg class="svg-icon"><use href="#lucide-x"/></svg></button>
     </div>
     <div class="modal-body">
 
@@ -664,14 +712,15 @@
 </div>
 
 <!-- ═══════════ REPEAT / COPY MODAL ═══════════ -->
-<div class="overlay" id="js-repeat-overlay">
+<div class="modal-container overlay" id="js-repeat-overlay">
+  <div class="modal-bg"></div>
   <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="js-repeat-modal-title">
     <div class="modal-header">
       <div>
         <div class="modal-header-title" id="js-repeat-modal-title">他の日にも入れる</div>
         <div class="modal-header-sub" id="js-repeat-modal-sub"></div>
       </div>
-      <button class="modal-close-btn" id="js-repeat-modal-close" aria-label="閉じる">✕</button>
+      <button class="modal-close-button modal-close-btn" id="js-repeat-modal-close" aria-label="閉じる"><svg class="svg-icon"><use href="#lucide-x"/></svg></button>
     </div>
     <div class="modal-body">
       <div class="form-row">
@@ -688,13 +737,14 @@
 </div>
 
 <!-- ═══════════ iOS PWA GUIDE MODAL ═══════════ -->
-<div class="overlay" id="js-ios-guide-overlay">
+<div class="modal-container overlay" id="js-ios-guide-overlay">
+  <div class="modal-bg"></div>
   <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="js-ios-guide-title">
     <div class="modal-header">
       <div>
         <div class="modal-header-title" id="js-ios-guide-title">📲 ホーム画面に追加が必要です</div>
       </div>
-      <button class="modal-close-btn" id="js-ios-guide-close" aria-label="閉じる">✕</button>
+      <button class="modal-close-button modal-close-btn" id="js-ios-guide-close" aria-label="閉じる"><svg class="svg-icon"><use href="#lucide-x"/></svg></button>
     </div>
     <div class="modal-body">
       <p style="font-size:13px;line-height:1.8;margin:0 0 10px;">
@@ -714,14 +764,15 @@
 </div>
 
 <!-- ═══════════ JCB INGEST SETTINGS MODAL ═══════════ -->
-<div class="overlay" id="js-jcb-overlay">
+<div class="modal-container overlay" id="js-jcb-overlay">
+  <div class="modal-bg"></div>
   <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="js-jcb-title">
     <div class="modal-header">
       <div>
         <div class="modal-header-title" id="js-jcb-title"><svg class="svg-icon"><use href="#lucide-credit-card"/></svg><span>JCBメール自動取込</span></div>
         <div class="modal-header-sub">利用通知メールの金額を家計簿へ自動登録</div>
       </div>
-      <button class="modal-close-btn" id="js-jcb-close" aria-label="閉じる">✕</button>
+      <button class="modal-close-button modal-close-btn" id="js-jcb-close" aria-label="閉じる"><svg class="svg-icon"><use href="#lucide-x"/></svg></button>
     </div>
     <div class="modal-body">
       <p style="font-size:13px;line-height:1.8;margin:0 0 12px;">
@@ -750,14 +801,15 @@
 </div>
 
 <!-- ═══════════ CATEGORY EDITOR MODAL ═══════════ -->
-<div class="overlay" id="js-cat-overlay">
+<div class="modal-container overlay" id="js-cat-overlay">
+  <div class="modal-bg"></div>
   <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="js-cat-modal-title">
     <div class="modal-header">
       <div>
         <div class="modal-header-title" id="js-cat-modal-title">カテゴリの管理</div>
         <div class="modal-header-sub">バイトにはシフトテンプレートと時給を設定できます</div>
       </div>
-      <button class="modal-close-btn" id="js-cat-modal-close" aria-label="閉じる">✕</button>
+      <button class="modal-close-button modal-close-btn" id="js-cat-modal-close" aria-label="閉じる"><svg class="svg-icon"><use href="#lucide-x"/></svg></button>
     </div>
     <div class="modal-body">
       <div id="js-cat-editor-list"></div>
@@ -784,14 +836,15 @@
 </div>
 
 <!-- ═══════════ BUDGET CATEGORY EDITOR MODAL ═══════════ -->
-<div class="overlay" id="js-budget-cat-overlay">
+<div class="modal-container overlay" id="js-budget-cat-overlay">
+  <div class="modal-bg"></div>
   <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="js-budget-cat-modal-title">
     <div class="modal-header">
       <div>
         <div class="modal-header-title" id="js-budget-cat-modal-title">家計簿カテゴリの管理</div>
         <div class="modal-header-sub">支出・収入のカテゴリを自由に編集できます</div>
       </div>
-      <button class="modal-close-btn" id="js-budget-cat-modal-close" aria-label="閉じる">✕</button>
+      <button class="modal-close-button modal-close-btn" id="js-budget-cat-modal-close" aria-label="閉じる"><svg class="svg-icon"><use href="#lucide-x"/></svg></button>
     </div>
     <div class="modal-body">
       <div class="budget-cat-tab-bar">
@@ -812,14 +865,15 @@
 </div>
 
 <!-- ═══════════ RECEIPT SCAN MODAL ═══════════ -->
-<div class="overlay" id="js-receipt-overlay">
+<div class="modal-container overlay" id="js-receipt-overlay">
+  <div class="modal-bg"></div>
   <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="js-receipt-modal-title">
     <div class="modal-header">
       <div>
         <div class="modal-header-title" id="js-receipt-modal-title"><svg class="svg-icon"><use href="#lucide-camera"/></svg><span>レシート読取</span></div>
         <div class="modal-header-sub">レシートを撮影・選択して支出を自動入力</div>
       </div>
-      <button class="modal-close-btn" id="js-receipt-modal-close" aria-label="閉じる">✕</button>
+      <button class="modal-close-button modal-close-btn" id="js-receipt-modal-close" aria-label="閉じる"><svg class="svg-icon"><use href="#lucide-x"/></svg></button>
     </div>
     <div class="modal-body">
       <!-- Step 1: Upload -->
@@ -874,14 +928,15 @@
 
 
 <!-- ═══════════ OVERTIME CASHOUT MODAL ═══════════ -->
-<div class="overlay" id="js-overtime-cashout-overlay">
+<div class="modal-container overlay" id="js-overtime-cashout-overlay">
+  <div class="modal-bg"></div>
   <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="js-overtime-cashout-title">
     <div class="modal-header">
       <div>
         <div class="modal-header-title" id="js-overtime-cashout-title"><svg class="svg-icon"><use href="#lucide-timer"/></svg><span>残業を給料に振替</span></div>
         <div class="modal-header-sub" id="js-overtime-cashout-sub"></div>
       </div>
-      <button class="modal-close-btn" id="js-overtime-cashout-close" aria-label="閉じる">✕</button>
+      <button class="modal-close-button modal-close-btn" id="js-overtime-cashout-close" aria-label="閉じる"><svg class="svg-icon"><use href="#lucide-x"/></svg></button>
     </div>
     <div class="modal-body">
       <div class="form-row">
@@ -916,13 +971,14 @@
 </div>
 
 <!-- ═══════════ DRINK LIMIT WARNING MODAL ═══════════ -->
-<div class="overlay" id="js-drink-limit-overlay" role="dialog" aria-modal="true" aria-labelledby="js-drink-limit-title">
+<div class="modal-container overlay" id="js-drink-limit-overlay" role="dialog" aria-modal="true" aria-labelledby="js-drink-limit-title">
+  <div class="modal-bg"></div>
   <div class="modal" style="max-width: 360px;">
     <div class="modal-header">
       <div>
         <div class="modal-header-title" id="js-drink-limit-title"><svg class="svg-icon"><use href="#lucide-alert-triangle"/></svg><span>飲み過ぎ注意</span></div>
       </div>
-      <button class="modal-close-btn" id="js-drink-limit-close" aria-label="閉じる">✕</button>
+      <button class="modal-close-button modal-close-btn" id="js-drink-limit-close" aria-label="閉じる"><svg class="svg-icon"><use href="#lucide-x"/></svg></button>
     </div>
     <div class="modal-body">
       <p style="line-height:1.6;">
@@ -938,14 +994,15 @@
 </div>
 
 <!-- ═══════════ OVERTIME HISTORY MODAL ═══════════ -->
-<div class="overlay" id="js-overtime-history-overlay">
+<div class="modal-container overlay" id="js-overtime-history-overlay">
+  <div class="modal-bg"></div>
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="js-overtime-history-title">
     <div class="modal-header">
       <div>
         <div class="modal-header-title" id="js-overtime-history-title"><svg class="svg-icon"><use href="#lucide-bar-chart-3"/></svg><span>残業の履歴</span></div>
         <div class="modal-header-sub">月別の残業時間と、給料に振替えた履歴を確認できます</div>
       </div>
-      <button class="modal-close-btn" id="js-overtime-history-close" aria-label="閉じる">✕</button>
+      <button class="modal-close-button modal-close-btn" id="js-overtime-history-close" aria-label="閉じる"><svg class="svg-icon"><use href="#lucide-x"/></svg></button>
     </div>
     <div class="modal-body">
       <div class="overtime-history-tabs" id="js-overtime-history-tabs"></div>
@@ -955,14 +1012,15 @@
 </div>
 
 <!-- ═══════════ DAILY PLAN MODAL ═══════════ -->
-<div class="overlay" id="js-daily-plan-overlay">
+<div class="modal-container overlay" id="js-daily-plan-overlay">
+  <div class="modal-bg"></div>
   <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="js-daily-plan-modal-title">
     <div class="modal-header">
       <div>
         <div class="modal-header-title" id="js-daily-plan-modal-title"><svg class="svg-icon"><use href="#lucide-clipboard-list"/></svg><span>明日のタスクを計画</span></div>
         <div class="modal-header-sub" id="js-daily-plan-date-label"></div>
       </div>
-      <button class="modal-close-btn" id="js-daily-plan-close" aria-label="閉じる">✕</button>
+      <button class="modal-close-button modal-close-btn" id="js-daily-plan-close" aria-label="閉じる"><svg class="svg-icon"><use href="#lucide-x"/></svg></button>
     </div>
     <div class="modal-body">
       <div class="form-row">
@@ -995,31 +1053,32 @@
 <!-- ═══════════ MOBILE: FAB (＋ 予定追加) ═══════════ -->
 <button class="fab" id="js-fab-add" type="button" aria-label="予定を追加">＋</button>
 
-<!-- ═══════════ MOBILE: 下部ナビバー ═══════════ -->
-<nav class="mobile-bottombar" id="js-mobile-bottombar" aria-label="ビュー切替">
-  <button class="mbb-btn is-active" type="button" data-view="month" aria-label="月ビュー">
-    <span class="mbb-icon"><svg viewBox="0 0 16 16"><rect x="1" y="2" width="14" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/><line x1="1" y1="5.5" x2="15" y2="5.5" stroke="currentColor" stroke-width="1"/><line x1="5" y1="5.5" x2="5" y2="14" stroke="currentColor" stroke-width="0.6" opacity="0.4"/><line x1="8" y1="5.5" x2="8" y2="14" stroke="currentColor" stroke-width="0.6" opacity="0.4"/><line x1="11" y1="5.5" x2="11" y2="14" stroke="currentColor" stroke-width="0.6" opacity="0.4"/></svg></span><span class="mbb-label">月</span>
+<!-- ═══════════ MOBILE TOOLBAR (Obsidian: .mobile-toolbar) ═══════════ -->
+<nav class="mobile-toolbar mobile-bottombar" id="js-mobile-bottombar" aria-label="ビュー切替">
+  <button class="mobile-toolbar-button mbb-btn is-active" type="button" data-view="month" aria-label="月ビュー">
+    <span class="mobile-toolbar-button-icon mbb-icon"><svg class="svg-icon"><use href="#lucide-calendar-days"/></svg></span><span class="mbb-label">月</span>
   </button>
-  <button class="mbb-btn" type="button" data-view="week" aria-label="週ビュー">
-    <span class="mbb-icon"><svg viewBox="0 0 16 16"><rect x="1" y="2" width="14" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/><line x1="1" y1="5.5" x2="15" y2="5.5" stroke="currentColor" stroke-width="1"/><line x1="3.3" y1="2" x2="3.3" y2="14" stroke="currentColor" stroke-width="0.6" opacity="0.5"/><line x1="5.6" y1="2" x2="5.6" y2="14" stroke="currentColor" stroke-width="0.6" opacity="0.5"/><line x1="8" y1="2" x2="8" y2="14" stroke="currentColor" stroke-width="0.6" opacity="0.5"/><line x1="10.4" y1="2" x2="10.4" y2="14" stroke="currentColor" stroke-width="0.6" opacity="0.5"/><line x1="12.7" y1="2" x2="12.7" y2="14" stroke="currentColor" stroke-width="0.6" opacity="0.5"/></svg></span><span class="mbb-label">週</span>
+  <button class="mobile-toolbar-button mbb-btn" type="button" data-view="week" aria-label="週ビュー">
+    <span class="mobile-toolbar-button-icon mbb-icon"><svg class="svg-icon"><use href="#lucide-calendar-range"/></svg></span><span class="mbb-label">週</span>
   </button>
-  <button class="mbb-btn" type="button" data-view="day" aria-label="日ビュー">
-    <span class="mbb-icon"><svg viewBox="0 0 16 16"><rect x="3" y="2" width="10" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/><line x1="3" y1="5.5" x2="13" y2="5.5" stroke="currentColor" stroke-width="1"/><line x1="5" y1="7.5" x2="11" y2="7.5" stroke="currentColor" stroke-width="0.5" opacity="0.3"/><line x1="5" y1="9.5" x2="11" y2="9.5" stroke="currentColor" stroke-width="0.5" opacity="0.3"/><line x1="5" y1="11.5" x2="11" y2="11.5" stroke="currentColor" stroke-width="0.5" opacity="0.3"/></svg></span><span class="mbb-label">日</span>
+  <button class="mobile-toolbar-button mbb-btn" type="button" data-view="day" aria-label="日ビュー">
+    <span class="mobile-toolbar-button-icon mbb-icon"><svg class="svg-icon"><use href="#lucide-calendar-clock"/></svg></span><span class="mbb-label">日</span>
   </button>
-  <button class="mbb-btn" type="button" id="js-mbb-more" aria-label="メニュー">
-    <span class="mbb-icon"><svg viewBox="0 0 16 16"><circle cx="3" cy="8" r="1.3" fill="currentColor"/><circle cx="8" cy="8" r="1.3" fill="currentColor"/><circle cx="13" cy="8" r="1.3" fill="currentColor"/></svg></span><span class="mbb-label">他</span>
+  <button class="mobile-toolbar-button mbb-btn" type="button" id="js-mbb-more" aria-label="メニュー">
+    <span class="mobile-toolbar-button-icon mbb-icon"><svg class="svg-icon"><use href="#lucide-more-horizontal"/></svg></span><span class="mbb-label">他</span>
   </button>
-  <button class="mbb-btn" type="button" id="js-mbb-timer" aria-label="タイマー">
-    <span class="mbb-icon"><svg viewBox="0 0 16 16"><line x1="6" y1="1.6" x2="10" y2="1.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="9.5" r="5.2" fill="none" stroke="currentColor" stroke-width="1.2"/><line x1="8" y1="9.5" x2="8" y2="6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span><span class="mbb-label">タイマー</span>
+  <button class="mobile-toolbar-button mbb-btn" type="button" id="js-mbb-timer" aria-label="タイマー">
+    <span class="mobile-toolbar-button-icon mbb-icon"><svg class="svg-icon"><use href="#lucide-timer"/></svg></span><span class="mbb-label">タイマー</span>
   </button>
 </nav>
 
 <!-- ═══════════ タイマー（カウントダウン / ポモドーロ） ═══════════ -->
-<div class="overlay" id="js-timer-overlay">
+<div class="modal-container overlay" id="js-timer-overlay">
+  <div class="modal-bg"></div>
   <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="js-timer-title">
     <div class="modal-header">
       <div><div class="modal-header-title" id="js-timer-title">タイマー</div></div>
-      <button class="modal-close-btn" id="js-timer-close" aria-label="閉じる">✕</button>
+      <button class="modal-close-button modal-close-btn" id="js-timer-close" aria-label="閉じる"><svg class="svg-icon"><use href="#lucide-x"/></svg></button>
     </div>
     <div class="modal-body">
       <div class="timer-tabs">
@@ -1062,7 +1121,8 @@
 </div>
 
 <!-- ═══════════ 汎用確認ダイアログ（ネイティブ confirm の代替）═══════════ -->
-<div class="overlay" id="js-confirm-overlay">
+<div class="modal-container overlay" id="js-confirm-overlay">
+  <div class="modal-bg"></div>
   <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="js-confirm-msg">
     <div class="modal-body">
       <div class="confirm-msg" id="js-confirm-msg"></div>

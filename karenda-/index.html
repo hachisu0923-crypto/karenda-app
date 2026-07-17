@@ -521,35 +521,36 @@
           <label class="form-label">よく使う予定</label>
           <div class="template-chip-list" id="js-ev-template-chip-list"></div>
         </div>
-        <div class="form-row">
-          <label class="form-label" for="js-ev-title">タイトル</label>
-          <input class="form-input" type="text" id="js-ev-title" placeholder="予定のタイトル" autocomplete="off" />
-        </div>
-        <div class="form-row form-row-2col">
-          <div>
-            <label class="form-label" for="js-ev-time-start">開始時刻（任意）</label>
-            <input class="form-input" type="time" id="js-ev-time-start" />
+        <input class="metadata-title-input" type="text" id="js-ev-title" placeholder="予定のタイトル" autocomplete="off" />
+        <div class="metadata-container">
+        <div class="metadata-property" data-property-key="開始">
+          <div class="metadata-property-key">
+            <span class="metadata-property-icon"><svg class="svg-icon"><use href="#lucide-clock"/></svg></span>
+            <span class="metadata-property-key-input">開始</span>
           </div>
-          <div>
-            <label class="form-label" for="js-ev-time-end">終了時刻（任意）</label>
-            <input class="form-input" type="time" id="js-ev-time-end" />
+          <div class="metadata-property-value"><input class="metadata-input" type="time" id="js-ev-time-start" /></div>
+        </div>
+        <div class="metadata-property" data-property-key="終了">
+          <div class="metadata-property-key">
+            <span class="metadata-property-icon"><svg class="svg-icon"><use href="#lucide-clock"/></svg></span>
+            <span class="metadata-property-key-input">終了</span>
           </div>
+          <div class="metadata-property-value"><input class="metadata-input" type="time" id="js-ev-time-end" /></div>
         </div>
-        <div class="form-row">
-          <label class="form-label" for="js-ev-reminder"><svg class="svg-icon"><use href="#lucide-bell"/></svg><span>通知</span></label>
-          <select class="form-input" id="js-ev-reminder">
-            <option value="">なし</option>
-            <option value="5">5分前</option>
-            <option value="10">10分前</option>
-            <option value="15">15分前</option>
-            <option value="30">30分前</option>
-            <option value="60">1時間前</option>
-            <option value="120">2時間前</option>
-          </select>
+        <div class="metadata-property" data-property-key="通知">
+          <div class="metadata-property-key">
+            <span class="metadata-property-icon"><svg class="svg-icon"><use href="#lucide-bell"/></svg></span>
+            <span class="metadata-property-key-input">通知</span>
+          </div>
+          <div class="metadata-property-value"><select class="metadata-input" id="js-ev-reminder"><option value="">なし</option><option value="5">5分前</option><option value="10">10分前</option><option value="15">15分前</option><option value="30">30分前</option><option value="60">1時間前</option><option value="120">2時間前</option></select></div>
         </div>
-        <div class="form-row">
-          <label class="form-label">カテゴリ</label>
-          <div class="cat-chip-list" id="js-cat-chip-list"></div>
+        <div class="metadata-property" data-property-key="カテゴリ">
+          <div class="metadata-property-key">
+            <span class="metadata-property-icon"><svg class="svg-icon"><use href="#lucide-tag"/></svg></span>
+            <span class="metadata-property-key-input">カテゴリ</span>
+          </div>
+          <div class="metadata-property-value"><div class="cat-chip-list" id="js-cat-chip-list"></div></div>
+        </div>
         </div>
         <button class="btn-primary" id="js-add-event-btn">＋ 追加</button>
         <button class="btn-secondary" id="js-ev-repeat-btn" style="margin-top:8px;"><svg class="svg-icon"><use href="#lucide-calendar-days"/></svg><span>曜日を指定して追加</span></button>
@@ -561,43 +562,64 @@
           <label class="form-label">よく使うシフト</label>
           <div class="template-chip-list" id="js-template-chip-list"></div>
         </div>
-        <div class="form-row form-row-2col">
-          <div>
-            <label class="form-label" for="js-shift-start">開始時刻</label>
-            <input class="form-input" type="time" id="js-shift-start" />
+        <div class="metadata-container">
+        <div class="metadata-property" data-property-key="開始">
+          <div class="metadata-property-key">
+            <span class="metadata-property-icon"><svg class="svg-icon"><use href="#lucide-clock"/></svg></span>
+            <span class="metadata-property-key-input">開始</span>
           </div>
-          <div>
-            <label class="form-label" for="js-shift-end">終了時刻</label>
-            <input class="form-input" type="time" id="js-shift-end" />
-          </div>
+          <div class="metadata-property-value"><input class="metadata-input" type="time" id="js-shift-start" /></div>
         </div>
-        <div class="form-row form-row-2col">
-          <div>
-            <label class="form-label" for="js-shift-break">休憩時間（分）</label>
-            <input class="form-input" type="number" id="js-shift-break" placeholder="0" min="0" max="480" />
+        <div class="metadata-property" data-property-key="終了">
+          <div class="metadata-property-key">
+            <span class="metadata-property-icon"><svg class="svg-icon"><use href="#lucide-clock"/></svg></span>
+            <span class="metadata-property-key-input">終了</span>
           </div>
-          <div>
-            <label class="form-label" for="js-shift-overtime">残業時間</label>
-            <input class="form-input" type="time" id="js-shift-overtime" value="00:00" />
-          </div>
+          <div class="metadata-property-value"><input class="metadata-input" type="time" id="js-shift-end" /></div>
         </div>
-        <div class="wage-preview" id="js-wage-preview">
-          <div class="wage-preview-row">
-            <span class="wage-preview-label">勤務時間</span>
-            <span class="wage-preview-val" id="js-preview-hours">—</span>
+        <div class="metadata-property" data-property-key="休憩">
+          <div class="metadata-property-key">
+            <span class="metadata-property-icon"><svg class="svg-icon"><use href="#lucide-timer"/></svg></span>
+            <span class="metadata-property-key-input">休憩</span>
           </div>
-          <div class="wage-preview-row">
-            <span class="wage-preview-label">休憩（控除）</span>
-            <span class="wage-preview-val" id="js-preview-break">—</span>
+          <div class="metadata-property-value"><input class="metadata-input" type="number" id="js-shift-break" placeholder="0" min="0" max="480" /><span class="metadata-unit">分</span></div>
+        </div>
+        <div class="metadata-property" data-property-key="残業">
+          <div class="metadata-property-key">
+            <span class="metadata-property-icon"><svg class="svg-icon"><use href="#lucide-timer"/></svg></span>
+            <span class="metadata-property-key-input">残業</span>
           </div>
-          <div class="wage-preview-row">
-            <span class="wage-preview-label">残業（バンクへ）</span>
-            <span class="wage-preview-val" id="js-preview-overtime">—</span>
+          <div class="metadata-property-value"><input class="metadata-input" type="time" id="js-shift-overtime" value="00:00" /></div>
+        </div>
+          <div class="wage-preview" id="js-wage-preview">
+        <div class="metadata-property mod-computed" data-property-key="勤務時間">
+          <div class="metadata-property-key">
+            <span class="metadata-property-icon"><svg class="svg-icon"><use href="#lucide-timer"/></svg></span>
+            <span class="metadata-property-key-input">勤務時間</span>
           </div>
-          <div class="wage-preview-divider"></div>
-          <div class="wage-preview-row">
-            <span class="wage-preview-label">予想給料</span>
-            <span class="wage-preview-amount" id="js-preview-pay">—</span>
+          <div class="metadata-property-value"><span class="wage-preview-val" id="js-preview-hours">—</span></div>
+        </div>
+        <div class="metadata-property mod-computed" data-property-key="休憩（控除）">
+          <div class="metadata-property-key">
+            <span class="metadata-property-icon"><svg class="svg-icon"><use href="#lucide-timer"/></svg></span>
+            <span class="metadata-property-key-input">休憩（控除）</span>
+          </div>
+          <div class="metadata-property-value"><span class="wage-preview-val" id="js-preview-break">—</span></div>
+        </div>
+        <div class="metadata-property mod-computed" data-property-key="残業（バンクへ）">
+          <div class="metadata-property-key">
+            <span class="metadata-property-icon"><svg class="svg-icon"><use href="#lucide-timer"/></svg></span>
+            <span class="metadata-property-key-input">残業（バンクへ）</span>
+          </div>
+          <div class="metadata-property-value"><span class="wage-preview-val" id="js-preview-overtime">—</span></div>
+        </div>
+        <div class="metadata-property mod-computed mod-total" data-property-key="予想給料">
+          <div class="metadata-property-key">
+            <span class="metadata-property-icon"><svg class="svg-icon"><use href="#lucide-wallet"/></svg></span>
+            <span class="metadata-property-key-input">予想給料</span>
+          </div>
+          <div class="metadata-property-value"><span class="wage-preview-amount" id="js-preview-pay">—</span></div>
+        </div>
           </div>
         </div>
         <div class="no-shift-warning" id="js-no-shift-warning" style="display:none">
@@ -623,84 +645,102 @@
       <button class="modal-close-button modal-close-btn" id="js-edit-modal-close" aria-label="閉じる"><svg class="svg-icon"><use href="#lucide-x"/></svg></button>
     </div>
     <div class="modal-body">
+      <!-- Obsidian のプロパティ表。タイトルは表に入れない（ノート名に相当し、
+           見出しでインライン編集する）。開始/終了は 1行1プロパティに分解。 -->
+      <input class="metadata-title-input" type="text" id="js-edit-ev-title" placeholder="予定のタイトル" autocomplete="off" />
 
-      <!-- Normal event edit form -->
-      <div class="add-section" id="js-edit-tab-event">
-        <div class="form-row">
-          <label class="form-label" for="js-edit-ev-title">タイトル</label>
-          <input class="form-input" type="text" id="js-edit-ev-title" placeholder="予定のタイトル" autocomplete="off" />
-        </div>
-        <div class="form-row form-row-2col">
-          <div>
-            <label class="form-label" for="js-edit-ev-time-start">開始時刻（任意）</label>
-            <input class="form-input" type="time" id="js-edit-ev-time-start" />
+      <div class="metadata-container" id="js-edit-tab-event">
+        <div class="metadata-property" data-property-key="開始">
+          <div class="metadata-property-key">
+            <span class="metadata-property-icon"><svg class="svg-icon"><use href="#lucide-clock"/></svg></span>
+            <span class="metadata-property-key-input">開始</span>
           </div>
-          <div>
-            <label class="form-label" for="js-edit-ev-time-end">終了時刻（任意）</label>
-            <input class="form-input" type="time" id="js-edit-ev-time-end" />
+          <div class="metadata-property-value"><input class="metadata-input" type="time" id="js-edit-ev-time-start" /></div>
+        </div>
+        <div class="metadata-property" data-property-key="終了">
+          <div class="metadata-property-key">
+            <span class="metadata-property-icon"><svg class="svg-icon"><use href="#lucide-clock"/></svg></span>
+            <span class="metadata-property-key-input">終了</span>
           </div>
+          <div class="metadata-property-value"><input class="metadata-input" type="time" id="js-edit-ev-time-end" /></div>
         </div>
-        <div class="form-row">
-          <label class="form-label" for="js-edit-ev-reminder"><svg class="svg-icon"><use href="#lucide-bell"/></svg><span>通知</span></label>
-          <select class="form-input" id="js-edit-ev-reminder">
-            <option value="">なし</option>
-            <option value="5">5分前</option>
-            <option value="10">10分前</option>
-            <option value="15">15分前</option>
-            <option value="30">30分前</option>
-            <option value="60">1時間前</option>
-            <option value="120">2時間前</option>
-          </select>
+        <div class="metadata-property" data-property-key="通知">
+          <div class="metadata-property-key">
+            <span class="metadata-property-icon"><svg class="svg-icon"><use href="#lucide-bell"/></svg></span>
+            <span class="metadata-property-key-input">通知</span>
+          </div>
+          <div class="metadata-property-value"><select class="metadata-input" id="js-edit-ev-reminder"><option value="">なし</option><option value="5">5分前</option><option value="10">10分前</option><option value="15">15分前</option><option value="30">30分前</option><option value="60">1時間前</option><option value="120">2時間前</option></select></div>
         </div>
-        <div class="form-row">
-          <label class="form-label">カテゴリ</label>
-          <div class="cat-chip-list" id="js-edit-cat-chip-list"></div>
+        <div class="metadata-property" data-property-key="カテゴリ">
+          <div class="metadata-property-key">
+            <span class="metadata-property-icon"><svg class="svg-icon"><use href="#lucide-tag"/></svg></span>
+            <span class="metadata-property-key-input">カテゴリ</span>
+          </div>
+          <div class="metadata-property-value"><div class="cat-chip-list" id="js-edit-cat-chip-list"></div></div>
         </div>
       </div>
 
-      <!-- Shift edit form -->
-      <div class="add-section" id="js-edit-tab-shift" style="display:none">
-        <div class="form-row form-row-2col">
-          <div>
-            <label class="form-label" for="js-edit-shift-start">開始時刻</label>
-            <input class="form-input" type="time" id="js-edit-shift-start" />
+      <div class="metadata-container" id="js-edit-tab-shift" style="display:none">
+        <div class="metadata-property" data-property-key="開始">
+          <div class="metadata-property-key">
+            <span class="metadata-property-icon"><svg class="svg-icon"><use href="#lucide-clock"/></svg></span>
+            <span class="metadata-property-key-input">開始</span>
           </div>
-          <div>
-            <label class="form-label" for="js-edit-shift-end">終了時刻</label>
-            <input class="form-input" type="time" id="js-edit-shift-end" />
-          </div>
+          <div class="metadata-property-value"><input class="metadata-input" type="time" id="js-edit-shift-start" /></div>
         </div>
-        <div class="form-row form-row-2col">
-          <div>
-            <label class="form-label" for="js-edit-shift-break">休憩時間（分）</label>
-            <input class="form-input" type="number" id="js-edit-shift-break" placeholder="0" min="0" max="480" />
+        <div class="metadata-property" data-property-key="終了">
+          <div class="metadata-property-key">
+            <span class="metadata-property-icon"><svg class="svg-icon"><use href="#lucide-clock"/></svg></span>
+            <span class="metadata-property-key-input">終了</span>
           </div>
-          <div>
-            <label class="form-label" for="js-edit-shift-overtime">残業時間</label>
-            <input class="form-input" type="time" id="js-edit-shift-overtime" value="00:00" />
-          </div>
+          <div class="metadata-property-value"><input class="metadata-input" type="time" id="js-edit-shift-end" /></div>
         </div>
+        <div class="metadata-property" data-property-key="休憩">
+          <div class="metadata-property-key">
+            <span class="metadata-property-icon"><svg class="svg-icon"><use href="#lucide-timer"/></svg></span>
+            <span class="metadata-property-key-input">休憩</span>
+          </div>
+          <div class="metadata-property-value"><input class="metadata-input" type="number" id="js-edit-shift-break" placeholder="0" min="0" max="480" /><span class="metadata-unit">分</span></div>
+        </div>
+        <div class="metadata-property" data-property-key="残業">
+          <div class="metadata-property-key">
+            <span class="metadata-property-icon"><svg class="svg-icon"><use href="#lucide-timer"/></svg></span>
+            <span class="metadata-property-key-input">残業</span>
+          </div>
+          <div class="metadata-property-value"><input class="metadata-input" type="time" id="js-edit-shift-overtime" value="00:00" /></div>
+        </div>
+        <!-- 算出値。Obsidian の読み取り専用プロパティ行に相当する。 -->
         <div class="wage-preview" id="js-edit-wage-preview">
-          <div class="wage-preview-row">
-            <span class="wage-preview-label">勤務時間</span>
-            <span class="wage-preview-val" id="js-edit-preview-hours">—</span>
+        <div class="metadata-property mod-computed" data-property-key="勤務時間">
+          <div class="metadata-property-key">
+            <span class="metadata-property-icon"><svg class="svg-icon"><use href="#lucide-timer"/></svg></span>
+            <span class="metadata-property-key-input">勤務時間</span>
           </div>
-          <div class="wage-preview-row">
-            <span class="wage-preview-label">休憩（控除）</span>
-            <span class="wage-preview-val" id="js-edit-preview-break">—</span>
+          <div class="metadata-property-value"><span class="wage-preview-val" id="js-edit-preview-hours">—</span></div>
+        </div>
+        <div class="metadata-property mod-computed" data-property-key="休憩（控除）">
+          <div class="metadata-property-key">
+            <span class="metadata-property-icon"><svg class="svg-icon"><use href="#lucide-timer"/></svg></span>
+            <span class="metadata-property-key-input">休憩（控除）</span>
           </div>
-          <div class="wage-preview-row">
-            <span class="wage-preview-label">残業（バンクへ）</span>
-            <span class="wage-preview-val" id="js-edit-preview-overtime">—</span>
+          <div class="metadata-property-value"><span class="wage-preview-val" id="js-edit-preview-break">—</span></div>
+        </div>
+        <div class="metadata-property mod-computed" data-property-key="残業（バンクへ）">
+          <div class="metadata-property-key">
+            <span class="metadata-property-icon"><svg class="svg-icon"><use href="#lucide-timer"/></svg></span>
+            <span class="metadata-property-key-input">残業（バンクへ）</span>
           </div>
-          <div class="wage-preview-divider"></div>
-          <div class="wage-preview-row">
-            <span class="wage-preview-label">予想給料</span>
-            <span class="wage-preview-amount" id="js-edit-preview-pay">—</span>
+          <div class="metadata-property-value"><span class="wage-preview-val" id="js-edit-preview-overtime">—</span></div>
+        </div>
+        <div class="metadata-property mod-computed mod-total" data-property-key="予想給料">
+          <div class="metadata-property-key">
+            <span class="metadata-property-icon"><svg class="svg-icon"><use href="#lucide-wallet"/></svg></span>
+            <span class="metadata-property-key-input">予想給料</span>
           </div>
+          <div class="metadata-property-value"><span class="wage-preview-amount" id="js-edit-preview-pay">—</span></div>
+        </div>
         </div>
       </div>
-
     </div>
     <div class="modal-footer">
       <button class="btn-secondary" id="js-edit-copy-btn" style="margin-right:auto;"><svg class="svg-icon"><use href="#lucide-clipboard-list"/></svg><span>他の日にコピー</span></button>

@@ -111,6 +111,25 @@
   --dialog-max-height: 85vh;
   --modal-max-width: 1100px;
   --modal-max-height: 1000px;
+
+  /* — Property table (Obsidian の実測値) — */
+  --metadata-background: transparent;
+  --metadata-padding: var(--size-4-2) 0;
+  --metadata-gap: 3px;
+  --metadata-property-padding: 0;
+  --metadata-property-radius: 6px;
+  --metadata-property-background: transparent;
+  --metadata-property-box-shadow-hover: 0 0 0 var(--border-width) var(--background-modifier-border-hover);
+  --metadata-property-box-shadow-focus: 0 0 0 2px var(--background-modifier-border-focus);
+  --metadata-label-background: transparent;
+  --metadata-label-background-hover: transparent;
+  --metadata-label-text-color: var(--text-muted);
+  --metadata-label-font: var(--font-interface);
+  --metadata-label-font-size: var(--font-smaller);
+  --metadata-label-width: 9em;
+  --metadata-input-height: calc(var(--font-text-size) * 1.75);
+  --metadata-input-padding: var(--size-4-1) var(--size-4-2);
+  --font-text-size: 16px;
   --modal-border-width: var(--border-width);
   --cursor: default;
 
@@ -430,6 +449,113 @@ body {
 
 /* ボタン等でアイコンとラベルを並べるときの既定の間隔 */
 .svg-icon + span { margin-left: var(--size-4-1); }
+
+/* ============================================================
+   PROPERTY TABLE — Obsidian の frontmatter 表
+   .metadata-container > .metadata-property > key + value。
+   値は Obsidian 本体の app.css からの実測。ラベル幅 9em、行の角丸 6px、
+   行間 3px、区切り線なし。1行1プロパティ（2列フォームは分解する）。
+   ============================================================ */
+.metadata-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--metadata-gap);
+  padding: var(--metadata-padding);
+  color: var(--text-muted);
+  background-color: var(--metadata-background);
+}
+.metadata-property {
+  display: flex;
+  align-items: start;
+  gap: var(--size-2-2);
+  padding: var(--metadata-property-padding);
+  border-radius: var(--metadata-property-radius);
+  background-color: var(--metadata-property-background);
+  min-height: var(--metadata-input-height);
+}
+.metadata-property:hover { box-shadow: var(--metadata-property-box-shadow-hover); }
+.metadata-property:focus-within { box-shadow: var(--metadata-property-box-shadow-focus); }
+
+.metadata-property-key {
+  display: flex;
+  align-self: stretch;
+  align-items: center;
+  flex-shrink: 0;
+  gap: var(--size-2-2);
+  width: var(--metadata-label-width);
+  font-family: var(--metadata-label-font);
+  font-size: var(--metadata-label-font-size);
+  color: var(--metadata-label-text-color);
+  background-color: var(--metadata-label-background);
+  padding: var(--size-4-1) var(--size-2-3);
+  border-radius: var(--radius-s);
+  overflow: hidden;
+}
+.metadata-property-key:hover { background-color: var(--metadata-label-background-hover); }
+.metadata-property-icon {
+  display: flex;
+  align-items: center;
+  color: var(--icon-color);
+  --icon-size: var(--icon-xs);
+}
+.metadata-property-key-input {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.metadata-property-value {
+  display: flex;
+  flex: 1 1 auto;
+  gap: var(--size-2-2);
+  align-items: center;
+  align-self: stretch;
+  overflow: hidden;
+  min-width: 0;
+}
+/* 表の中の入力欄は枠なし（Obsidian は --input-border-width:0 を行に効かせる） */
+.metadata-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-s);
+  color: var(--text-normal);
+  font-family: inherit;
+  font-size: var(--font-ui-small);
+  padding: var(--metadata-input-padding);
+  height: var(--metadata-input-height);
+}
+.metadata-input:focus { outline: none; background: var(--background-modifier-form-field); }
+.metadata-input[type="number"] { flex: 0 0 5em; }
+.metadata-unit { color: var(--text-faint); font-size: var(--font-ui-smaller); flex-shrink: 0; }
+
+/* 算出値の行（勤務時間・給料など）は読み取り専用 */
+.metadata-property.mod-computed .metadata-property-value {
+  padding: var(--size-4-1) var(--size-4-2);
+  color: var(--text-normal);
+  font-variant-numeric: tabular-nums;
+}
+.metadata-property.mod-computed:hover { box-shadow: none; }
+.metadata-property.mod-total { border-top: var(--border-width) solid var(--background-modifier-border); margin-top: var(--size-2-2); padding-top: var(--size-4-2); }
+.metadata-property.mod-total .metadata-property-value { color: var(--color-green); font-weight: var(--font-semibold); }
+
+/* タイトルはノート名相当。表の外で、見出しとして編集する。 */
+.metadata-title-input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--text-normal);
+  font-family: inherit;
+  font-size: var(--font-ui-large);
+  font-weight: var(--font-semibold);
+  padding: var(--size-4-2) var(--size-2-3);
+  margin-bottom: var(--size-4-2);
+}
+.metadata-title-input:focus { outline: none; background: var(--background-modifier-form-field); border-radius: var(--radius-s); }
+.metadata-title-input::placeholder { color: var(--text-faint); font-weight: var(--font-normal); }
+
+/* カテゴリ行のチップは値セル内で折り返す */
+.metadata-property-value .cat-chip-list { flex-wrap: wrap; gap: 4px; }
 
 /* ============================================================
    SETTINGS MODAL — Obsidian の .modal.mod-settings

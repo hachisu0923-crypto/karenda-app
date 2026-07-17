@@ -1751,7 +1751,15 @@ function renderExistingEvents() {
 let editingEv = null;  // reference to the event object being edited
 let editingCatId = null;
 
-function openEditModal(ev) {
+// `key` ('YYYY-MM-DD') はこの予定が属する日。省略時は selectedKey を使う。
+// 省略できるのは openDayModal 経由の呼び出しだけ（あれが selectedKey を立てる
+// 唯一の場所 = 1552 行）。日/週ビューやグラフのように日モーダルを経由しない
+// 導線は必ず渡すこと。渡さないと、アプリを開いてから一度も日付セルを押して
+// いなければ selectedKey が null で落ち、押していれば「その古い日付」の
+// モーダルが開く。
+function openEditModal(ev, key) {
+  if (key) selectedKey = key;
+  if (!selectedKey) return;        // 呼び出し側の渡し忘れで落とさない
   editingEv    = ev;
   editingCatId = ev.catId;
   const isS    = isShift(ev.catId);
@@ -3532,7 +3540,7 @@ function renderDayView() {
       chip.className = 'dv-allday-chip';
       chip.style.background = cat.color;
       chip.textContent = ev.title || cat.name;
-      chip.addEventListener('click', () => openEditModal(ev));
+      chip.addEventListener('click', () => openEditModal(ev, formatYMD(dvDate)));
       allDayBar.appendChild(chip);
     });
     const body = document.querySelector('.day-view-body');
@@ -3603,7 +3611,7 @@ function renderDayView() {
       <span class="dv-block-title">${escHtml(titleText)}</span>
       ${payLabel}`;
 
-    block.addEventListener('click', e => { e.stopPropagation(); openEditModal(ev); });
+    block.addEventListener('click', e => { e.stopPropagation(); openEditModal(ev, formatYMD(dvDate)); });
     evCol.appendChild(block);
   });
 
@@ -3707,7 +3715,7 @@ function renderWeekView() {
       chip.className = 'wv-allday-chip';
       chip.style.background = cat.color;
       chip.textContent = ev.title || cat.name;
-      chip.addEventListener('click', e => { e.stopPropagation(); openEditModal(ev); });
+      chip.addEventListener('click', e => { e.stopPropagation(); openEditModal(ev, key); });
       col.appendChild(chip);
       hasAnyAllday = true;
     });
@@ -3797,7 +3805,7 @@ function renderWeekView() {
       const { pay }   = isShift(ev.catId) ? calcShift(ev) : { pay: 0 };
       const payLabel  = isShift(ev.catId) && pay > 0 ? `<span class="dv-block-pay">${fmtYen(pay)}</span>` : '';
       block.innerHTML = `<span class="dv-block-time">${escHtml(timeStr)}</span><span class="dv-block-title">${escHtml(titleText)}</span>${payLabel}`;
-      block.addEventListener('click', e => { e.stopPropagation(); openEditModal(ev); });
+      block.addEventListener('click', e => { e.stopPropagation(); openEditModal(ev, key); });
       col.appendChild(block);
     });
 

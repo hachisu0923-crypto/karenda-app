@@ -306,21 +306,30 @@ const _isStandalone = () => window.navigator.standalone === true
 const _isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent)
   || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);  // iPadOS
 
+// ボタンは <svg>＋<span> の2要素。btn.textContent への代入はアイコンごと
+// 消してしまうので、ラベルとアイコンを個別に差し替える。
+function _setNotifBtn(icon, label) {
+  const use = document.querySelector('#js-notif-btn .svg-icon use');
+  const lbl = document.getElementById('js-notif-label');
+  if (use) use.setAttribute('href', `#lucide-${icon}`);
+  if (lbl) lbl.textContent = label;
+}
+
 function _updateNotifBtn() {
   const btn = document.getElementById('js-notif-btn');
   if (!btn) return;
   if (!('Notification' in window)) {
     // iOS Safari（未インストール）は通知 API 自体が無い → 案内導線として表示を残す
-    if (_isIOS() && !_isStandalone()) { btn.textContent = '🔔 通知を有効にする'; return; }
+    if (_isIOS() && !_isStandalone()) { _setNotifBtn('bell', '通知を有効にする'); return; }
     btn.style.display = 'none';
     return;
   }
   const p = Notification.permission;
   btn.classList.toggle('is-on', p === 'granted');
   btn.classList.toggle('is-denied', p === 'denied');
-  if (p === 'granted')      btn.textContent = '🔔 通知 ON（テスト送信）';
-  else if (p === 'denied')  btn.textContent = '🔕 ブラウザ設定で許可が必要';
-  else                      btn.textContent = '🔔 通知を有効にする';
+  if (p === 'granted')      _setNotifBtn('bell', '通知 ON（テスト送信）');
+  else if (p === 'denied')  _setNotifBtn('bell-off', 'ブラウザ設定で許可が必要');
+  else                      _setNotifBtn('bell', '通知を有効にする');
 }
 
 document.getElementById('js-notif-btn')?.addEventListener('click', async () => {
@@ -1267,7 +1276,7 @@ function renderSalarySummary() {
     ovRow.className = 'salary-overtime-row';
     const cashoutHHMM = data.cashoutPay > 0 ? ` <span style="opacity:.7">(振替済 ${fmtYen(data.cashoutPay)})</span>` : '';
     ovRow.innerHTML = `
-      <span class="overtime-label">⏱ 残業バンク${cashoutHHMM}</span>
+      <span class="overtime-label"><svg class="svg-icon"><use href="#lucide-timer"/></svg> 残業バンク${cashoutHHMM}</span>
       <span class="overtime-balance${bank === 0 ? ' is-zero' : ''}">${formatMinToHHMM(bank)}</span>`;
     box.appendChild(ovRow);
   });
@@ -1298,8 +1307,8 @@ function renderSalarySummary() {
     const actions = document.createElement('div');
     actions.className = 'salary-overtime-actions';
     actions.innerHTML = `
-      <button id="js-overtime-cashout-open" type="button" ${anyBankBalance ? '' : 'disabled'}>⏱ 残業を振替</button>
-      <button id="js-overtime-history-open" type="button">📊 履歴</button>`;
+      <button id="js-overtime-cashout-open" type="button" ${anyBankBalance ? '' : 'disabled'}><svg class="svg-icon"><use href="#lucide-timer"/></svg> 残業を振替</button>
+      <button id="js-overtime-history-open" type="button"><svg class="svg-icon"><use href="#lucide-bar-chart-3"/></svg> 履歴</button>`;
     box.appendChild(actions);
     document.getElementById('js-overtime-cashout-open').addEventListener('click', openOvertimeCashoutModal);
     document.getElementById('js-overtime-history-open').addEventListener('click', openOvertimeHistoryModal);
@@ -1317,7 +1326,7 @@ function renderSidebar() {
     const row = document.createElement('div');
     row.className = 'category-row';
     const tag = cat.type==='shift'
-      ? ` <small style="font-size:9px;opacity:.5;font-weight:600">⏱ ${cat.hourlyWage?fmtYen(cat.hourlyWage)+'/h':''}</small>`
+      ? ` <small style="font-size:9px;opacity:.5;font-weight:600"><svg class="svg-icon"><use href="#lucide-timer"/></svg> ${cat.hourlyWage?fmtYen(cat.hourlyWage)+'/h':''}</small>`
       : '';
     row.innerHTML = `
       <span class="cat-color-dot" style="background:${cat.color}"></span>
@@ -1661,7 +1670,7 @@ function renderExistingEvents() {
       const {workMinutes,breakMinutes,pay}=calcShift(ev);
       const brk=breakMinutes>0?`休憩${breakMinutes}分　`:'';
       const ot = ev.overtimeMinutes ?? 0;
-      const otTag = ot > 0 ? `<span style="color:var(--color-accent-orange);font-weight:600">⏱+${formatMinToHHMM(ot)}</span>　` : '';
+      const otTag = ot > 0 ? `<span style="color:var(--color-accent-orange);font-weight:600"><svg class="svg-icon"><use href="#lucide-timer"/></svg>+${formatMinToHHMM(ot)}</span>　` : '';
       titleHtml=`<span class="ev-cat-chip" style="background:${cat.color}">${escHtml(cat.name)}</span>`;
       metaHtml=`<span class="ev-shift-time">${ev.shiftStart} – ${ev.shiftEnd}</span>
                 <span>${brk}${otTag}勤務 ${fmtMin(workMinutes)}</span>
@@ -1687,14 +1696,14 @@ function renderExistingEvents() {
     const editBtn = document.createElement('button');
     editBtn.className = 'ev-edit-btn';
     editBtn.title = '編集';
-    editBtn.textContent = '✏️';
+    editBtn.innerHTML = '<svg class=\"svg-icon\"><use href=\"#lucide-pencil\"/></svg>';
     editBtn.type = 'button';
     editBtn.addEventListener('click', e => { e.stopPropagation(); openEditModal(ev); });
 
     const delBtn = document.createElement('button');
     delBtn.className = 'ev-delete-btn';
     delBtn.title = '削除';
-    delBtn.textContent = '✕';
+    delBtn.innerHTML = '<svg class=\"svg-icon\"><use href=\"#lucide-x\"/></svg>';
     delBtn.type = 'button';
     delBtn.addEventListener('click', async e => {
       e.stopPropagation();
@@ -2461,7 +2470,7 @@ function renderCatEditorList() {
         <button class="cat-type-btn ${!isS?'is-active':''}" data-type="normal">予定</button>
         <button class="cat-type-btn ${isS?'is-active':''}" data-type="shift">バイト</button>
       </div>
-      <button class="cat-delete-btn" title="削除">🗑</button>`;
+      <button class="cat-delete-btn" title="削除"><svg class="svg-icon"><use href="#lucide-trash-2"/></svg></button>`;
 
     const wageRow=document.createElement('div');
     wageRow.className='cat-wage-row'+(isS?' is-visible':'');
@@ -2804,7 +2813,7 @@ function renderBudgetCatEditorList() {
       <button class="cat-color-swatch bcat-color-swatch" style="background:${cat.color}" title="色を変更"></button>
       <input class="bcat-icon-field" type="text" value="${escHtml(cat.icon)}" placeholder="🏷" maxlength="2" />
       <input class="cat-name-field" type="text" value="${escHtml(cat.name)}" placeholder="カテゴリ名" />
-      <button class="cat-delete-btn" title="削除">🗑</button>`;
+      <button class="cat-delete-btn" title="削除"><svg class="svg-icon"><use href="#lucide-trash-2"/></svg></button>`;
     row.querySelector('.bcat-color-swatch').addEventListener('click',e=>{
       openColorPopup(e.currentTarget, idx, _budgetCatTab==='expense'?'budget_exp':'budget_inc');
     });
@@ -3390,6 +3399,12 @@ document.getElementById('js-mbb-more')?.addEventListener('click', () => {
   if (!btn || !holder) return;
   const VID = 'PB8ZrGinWi0';
   let playing = false;
+  // ボタンは <svg>＋<span>。textContent 代入はアイコンを消すので個別に差し替える。
+  const setBtn = (icon, label) => {
+    btn.querySelector('.svg-icon use')?.setAttribute('href', `#lucide-${icon}`);
+    const lbl = document.getElementById('js-bgm-label');
+    if (lbl) lbl.textContent = label;
+  };
   btn.addEventListener('click', ()=>{
     if (!playing){
       // クリック（ユーザー操作）を起点に iframe を生成して自動再生・ループ
@@ -3398,13 +3413,13 @@ document.getElementById('js-mbb-more')?.addEventListener('click', () => {
         '<iframe src="https://www.youtube.com/embed/'+VID+'?autoplay=1&loop=1&playlist='+VID+'" '
         + 'title="BGM" frameborder="0" '
         + 'allow="autoplay; encrypted-media" allowfullscreen></iframe>';
-      btn.textContent = '⏸ BGMを停止';
+      setBtn('pause', 'BGMを停止');
       playing = true;
     } else {
       // iframe を破棄して停止
       holder.innerHTML = '';
       holder.hidden = true;
-      btn.textContent = '🎵 BGMを再生';
+      setBtn('music', 'BGMを再生');
       playing = false;
     }
   });
@@ -4274,7 +4289,7 @@ function initGoalPanel(userId) {
         <button class="goal-check" type="button" aria-label="達成切替">${done ? SVG_CHECK : ''}</button>
         <span class="goal-badge is-${type}">${type === 'main' ? '最重要' : type === 'sub' ? 'サブ' : '+α'}</span>
         <span class="goal-item-text ${!text ? 'is-placeholder' : ''}">${text ? escapeHtml(text) : placeholder}</span>
-        ${deletable ? '<button class="goal-del" type="button" aria-label="削除">✕</button>' : ''}
+        ${deletable ? '<button class="goal-del" type="button" aria-label="削除"><svg class="svg-icon"><use href="#lucide-x"/></svg></button>' : ''}
       </div>`;
   }
 
@@ -4621,7 +4636,7 @@ function renderTaskPanel() {
   const done  = tasks.filter(t => t.done).length;
   const total = tasks.length;
   const pText = total === 0 ? '0/0' : `${done}/${total}`;
-  els.progressEl.textContent = (total > 0 && done === total) ? `🎉 ${pText}` : pText;
+  els.progressEl.textContent = (total > 0 && done === total) ? `<svg class="svg-icon"><use href="#lucide-party-popper"/></svg> ${pText}` : pText;
 
   const today = _todayStr();
 
@@ -4660,8 +4675,8 @@ function renderTaskPanel() {
             <span class="task-priority-label ${pClass}">${pLabel}</span>
           </div>
         </div>
-        <button class="task-edit-btn" type="button" title="編集" aria-label="編集">✏</button>
-        <button class="task-del" type="button" title="削除" aria-label="削除">✕</button>
+        <button class="task-edit-btn" type="button" title="編集" aria-label="編集"><svg class="svg-icon"><use href="#lucide-pencil"/></svg></button>
+        <button class="task-del" type="button" title="削除" aria-label="削除"><svg class="svg-icon"><use href="#lucide-x"/></svg></button>
       </div>`;
   }).join('');
 }
@@ -5537,7 +5552,7 @@ function renderBudgetPanel() {
       }
       html += '<div class="budget-entry ' + (isInc ? 'is-income' : 'is-expense') + (isAuto ? ' is-auto' : '') + (gen.id === _budgetEditingId ? ' is-editing' : '') + '" data-budget-id="' + gen.id + '">' +
         '<span class="budget-entry-icon' + (isAuto ? ' is-shift-icon' : '') + '">' + gIcon + '</span>' +
-        '<div class="budget-entry-body"><span class="budget-entry-cat">' + gCatName + (isAuto ? '<span class="budget-auto-badge">' + autoBadge + '</span>' : '') + (gen.source === 'jcb' ? '<span class="budget-jcb-badge" title="JCBメールから自動取込">💳</span>' : '') + '</span>' +
+        '<div class="budget-entry-body"><span class="budget-entry-cat">' + gCatName + (isAuto ? '<span class="budget-auto-badge">' + autoBadge + '</span>' : '') + (gen.source === 'jcb' ? '<span class="budget-jcb-badge" title="JCBメールから自動取込"><svg class="svg-icon"><use href="#lucide-credit-card"/></svg></span>' : '') + '</span>' +
         (gen.memo ? '<span class="budget-entry-memo">' + escapeHtml(gen.memo) + '</span>' : '') +
         '</div>' +
         '<span class="budget-entry-amount ' + amountCls + '">' + displaySign + fmtYen(Math.abs(gen.amount)) + '</span>' +

@@ -69,8 +69,12 @@
   --icon-xs-stroke-width: 2px;    --icon-s-stroke-width: 2px;
   --icon-m-stroke-width:  1.75px; --icon-l-stroke-width: 1.75px;
   --icon-xl-stroke-width: 1.25px;
-  --icon-size:   var(--icon-m);
-  --icon-stroke: var(--icon-m-stroke-width);
+  /* Obsidian の既定は --icon-m (18px)。ただしそれは UI 文字が 13〜15px の
+     前提で、このアプリのクロームは 10〜14px と密なので 18px ではアイコンが
+     文字を圧倒する（実測で比 1.3〜1.8）。既定を --icon-xs に下げ、大きく
+     見せたい所だけコンテナ側で上書きする（--header-height 26px と同じ判断）。 */
+  --icon-size:   var(--icon-xs);
+  --icon-stroke: var(--icon-xs-stroke-width);
   --icon-opacity: 0.85;
 
   /* — Borders / dividers — */
@@ -346,13 +350,46 @@ body {
   --color-text:    var(--text-normal);
   --color-border:  var(--background-modifier-border);
   --color-bg-card: var(--background-primary-alt);
-
-  /* テーマ切替アイコン（Phase 2 で Lucide に置換して削除予定） */
-  --icon-theme: "☀️";
 }
 
-body.theme-light {
-  --icon-theme: "🌙";
+/* ============================================================
+   LUCIDE ICONS
+   Obsidian の .svg-icon と同じ規約: currentColor で塗り、サイズと線幅は
+   --icon-size / --icon-stroke で制御する。親要素がこの2つを上書きすれば
+   その配下のアイコンだけ大きさが変わる（Obsidian 本体と同じ仕組み）。
+   ============================================================ */
+.svg-icon {
+  width: var(--icon-size);
+  height: var(--icon-size);
+  stroke-width: var(--icon-stroke);
+  stroke: currentColor;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex-shrink: 0;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+/* ボタン等でアイコンとラベルを並べるときの既定の間隔 */
+.svg-icon + span { margin-left: var(--size-4-1); }
+
+/* 大きく見せる箇所だけ上書き（もとは font-size で絵文字を拡大していた）。
+   SVG は font-size に反応しないので、この上書きが無いと縮んで見える。 */
+.auth-logo,
+.receipt-drop-icon {
+  --icon-size:   var(--icon-xl);
+  --icon-stroke: var(--icon-xl-stroke-width);
+}
+
+/* 18px の枠に収めるロゴ */
+.blender-logo { --icon-size: var(--icon-s); }
+
+/* 給料サマリの行内など、9〜10px の極小文字に添えるアイコン */
+.overtime-label,
+.budget-jcb-badge,
+.cat-hourly-wage {
+  --icon-size: 12px;
 }
 
 /* ============================================================
@@ -1241,7 +1278,7 @@ body, body * { scrollbar-width: thin; scrollbar-color: var(--color-scrollbar) tr
 .btn-theme:hover {
   background: var(--color-btn-hover);
 }
-.btn-theme::before { content: var(--icon-theme); }
+/* テーマ切替は Lucide の sun / moon を app.js が差し替える（旧 --icon-theme 廃止） */
 
 /* Menubar tool link (e.g. スマホ表示プレビュー) — matches .btn-theme box */
 .btn-menubar-tool {

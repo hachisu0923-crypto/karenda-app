@@ -19,11 +19,61 @@
 <!-- theme-dark は app.js の isDark 既定値と一致させること。CSP でインライン
      script が使えないため、静的クラスが初回ペイントのちらつきを防ぐ唯一の手段。 -->
 <body class="theme-dark">
+<!-- ═══════════ LUCIDE ICON SPRITE ═══════════
+     Obsidian は Lucide アイコンだけを使う。ビルド工程が無く CSP でインライン
+     script も禁止なので、スプライトを1枚置いて <use href> で参照する。
+     lucide.createIcons() 方式を採らないのは、renderAll() が innerHTML="" で
+     全再構築するため描画のたびにアイコンが消えて再生成＝ちらつくから。
+     ジオメトリは Obsidian 同梱の Lucide テーブル (obsidian.asar) から生成。
+     ═══════════════════════════════════════════ -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+  <symbol id="lucide-calendar-days" viewBox="0 0 24 24"><path d="M8 2v4"/><path d="M16 2v4"/><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></symbol>
+  <symbol id="lucide-calendar-range" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M3 10h18"/><path d="M8 2v4"/><path d="M17 14h-6"/><path d="M13 18H7"/><path d="M7 14h.01"/><path d="M17 18h.01"/></symbol>
+  <symbol id="lucide-calendar-clock" viewBox="0 0 24 24"><path d="M16 14v2.2l1.6 1"/><path d="M16 2v4"/><path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/><path d="M3 10h5"/><path d="M8 2v4"/><circle cx="16" cy="16" r="6"/></symbol>
+  <symbol id="lucide-calendar-check" viewBox="0 0 24 24"><path d="M8 2v4"/><path d="M16 2v4"/><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18"/><path d="m9 16 2 2 4-4"/></symbol>
+  <symbol id="lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16"/><path d="M4 12h16"/><path d="M4 19h16"/></symbol>
+  <symbol id="lucide-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+  <symbol id="lucide-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+  <symbol id="lucide-chevron-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+  <symbol id="lucide-chevron-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="lucide-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="lucide-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></symbol>
+  <symbol id="lucide-moon" viewBox="0 0 24 24"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></symbol>
+  <symbol id="lucide-bell" viewBox="0 0 24 24"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></symbol>
+  <symbol id="lucide-bell-off" viewBox="0 0 24 24"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M17 17H4a1 1 0 0 1-.74-1.673C4.59 13.956 6 12.499 6 8a6 6 0 0 1 .258-1.742"/><path d="m2 2 20 20"/><path d="M8.668 3.01A6 6 0 0 1 18 8c0 2.687.77 4.653 1.707 6.05"/></symbol>
+  <symbol id="lucide-camera" viewBox="0 0 24 24"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"/><circle cx="12" cy="13" r="3"/></symbol>
+  <symbol id="lucide-credit-card" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></symbol>
+  <symbol id="lucide-tag" viewBox="0 0 24 24"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r="0.5"/></symbol>
+  <symbol id="lucide-clipboard-list" viewBox="0 0 24 24"><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></symbol>
+  <symbol id="lucide-smartphone" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><path d="M12 18h.01"/></symbol>
+  <symbol id="lucide-music" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></symbol>
+  <symbol id="lucide-pause" viewBox="0 0 24 24"><rect x="14" y="3" width="5" height="18" rx="1"/><rect x="5" y="3" width="5" height="18" rx="1"/></symbol>
+  <symbol id="lucide-timer" viewBox="0 0 24 24"><line x1="10" y1="2" x2="14" y2="2"/><line x1="12" y1="14" x2="15" y2="11"/><circle cx="12" cy="14" r="8"/></symbol>
+  <symbol id="lucide-repeat" viewBox="0 0 24 24"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></symbol>
+  <symbol id="lucide-alarm-clock" viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2"/><path d="M5 3 2 6"/><path d="m22 6-3-3"/><path d="M6.38 18.7 4 21"/><path d="M17.64 18.67 20 21"/></symbol>
+  <symbol id="lucide-party-popper" viewBox="0 0 24 24"><path d="M5.8 11.3 2 22l10.7-3.79"/><path d="M4 3h.01"/><path d="M22 8h.01"/><path d="M15 2h.01"/><path d="M22 20h.01"/><path d="m22 2-2.24.75a2.9 2.9 0 0 0-1.96 3.12c.1.86-.57 1.63-1.45 1.63h-.38c-.86 0-1.6.6-1.76 1.44L14 10"/><path d="m22 13-.82-.33c-.86-.34-1.82.2-1.98 1.11c-.11.7-.72 1.22-1.43 1.22H17"/><path d="m11 2 .33.82c.34.86-.2 1.82-1.11 1.98C9.52 4.9 9 5.52 9 6.23V7"/><path d="M11 13c1.93 1.93 2.83 4.17 2 5-.83.83-3.07-.07-5-2-1.93-1.93-2.83-4.17-2-5 .83-.83 3.07.07 5 2Z"/></symbol>
+  <symbol id="lucide-alert-triangle" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+  <symbol id="lucide-wallet" viewBox="0 0 24 24"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></symbol>
+  <symbol id="lucide-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></symbol>
+  <symbol id="lucide-list-checks" viewBox="0 0 24 24"><path d="M13 5h8"/><path d="M13 12h8"/><path d="M13 19h8"/><path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/></symbol>
+  <symbol id="lucide-bar-chart-3" viewBox="0 0 24 24"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></symbol>
+  <symbol id="lucide-list-tree" viewBox="0 0 24 24"><path d="M8 5h13"/><path d="M13 12h8"/><path d="M13 19h8"/><path d="M3 10a2 2 0 0 0 2 2h3"/><path d="M3 5v12a2 2 0 0 0 2 2h3"/></symbol>
+  <symbol id="lucide-sliders-horizontal" viewBox="0 0 24 24"><path d="M10 5H3"/><path d="M12 19H3"/><path d="M14 3v4"/><path d="M16 17v4"/><path d="M21 12h-9"/><path d="M21 19h-5"/><path d="M21 5h-7"/><path d="M8 10v4"/><path d="M8 12H3"/></symbol>
+  <symbol id="lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></symbol>
+  <symbol id="lucide-settings" viewBox="0 0 24 24"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="lucide-log-out" viewBox="0 0 24 24"><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/></symbol>
+  <symbol id="lucide-user" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+  <symbol id="lucide-refresh-cw" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></symbol>
+  <symbol id="lucide-trash-2" viewBox="0 0 24 24"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></symbol>
+  <symbol id="lucide-pencil" viewBox="0 0 24 24"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></symbol>
+  <symbol id="lucide-more-horizontal" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></symbol>
+  <symbol id="lucide-pin" viewBox="0 0 24 24"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></symbol>
+</svg>
 
 <!-- ═══════════ AUTH SCREEN ═══════════ -->
 <div id="js-auth-screen" class="auth-screen" style="display:none">
   <div class="auth-card">
-    <div class="auth-logo">📅</div>
+    <div class="auth-logo"><svg class="svg-icon"><use href="#lucide-calendar-days"/></svg></div>
     <h1 class="auth-title">My Calendar</h1>
     <p class="auth-sub">ログインしてどのデバイスからでも同期</p>
 
@@ -64,7 +114,7 @@
 <!-- ═══ BLENDER TOP MENU BAR ═══ -->
 <div class="blender-menubar">
   <div class="blender-menubar-left">
-    <div class="blender-logo">📅</div>
+    <div class="blender-logo"><svg class="svg-icon"><use href="#lucide-calendar-days"/></svg></div>
     <span class="blender-app-name">My Calendar</span>
     <span class="blender-menubar-sep"></span>
     <span class="sync-indicator" id="js-sync-indicator" title="同期状態"></span>
@@ -84,7 +134,7 @@
     </button>
   </div>
   <div class="blender-menubar-right">
-    <a class="btn-menubar-tool" href="./mobile-preview.html" target="_blank" rel="noopener" title="スマホ表示プレビュー">📱</a>
+    <a class="btn-menubar-tool" href="./mobile-preview.html" target="_blank" rel="noopener" title="スマホ表示プレビュー"><svg class="svg-icon"><use href="#lucide-smartphone"/></svg></a>
     <button class="btn-theme" id="js-theme-toggle" title="テーマ切替"></button>
   </div>
 </div>
@@ -125,7 +175,7 @@
 
     <!-- BGM (YouTube) ミニカレンダーの下 -->
     <div class="sidebar-section" id="js-section-bgm">
-      <button class="sidebar-btn" id="js-bgm-toggle" type="button">🎵 BGMを再生</button>
+      <button class="sidebar-btn" id="js-bgm-toggle" type="button"><svg class="svg-icon"><use href="#lucide-music"/></svg><span id="js-bgm-label">BGMを再生</span></button>
       <div class="bgm-player" id="js-bgm-player" hidden></div>
     </div>
 
@@ -167,7 +217,7 @@
 
     <!-- Push notification enable button -->
     <div class="sidebar-notif-area">
-      <button class="btn-notif" id="js-notif-btn">🔔 通知を有効にする</button>
+      <button class="btn-notif" id="js-notif-btn"><svg class="svg-icon"><use href="#lucide-bell"/></svg><span id="js-notif-label">通知を有効にする</span></button>
     </div>
 
     <!-- User info + logout -->
@@ -300,7 +350,7 @@
         <div class="bp-section-head">
           <span class="bp-section-title">タスク</span>
           <div class="bp-section-head-right">
-            <button class="btn-daily-plan" id="js-daily-plan-btn" title="明日のタスクを計画">📋 明日の計画</button>
+            <button class="btn-daily-plan" id="js-daily-plan-btn" title="明日のタスクを計画"><svg class="svg-icon"><use href="#lucide-clipboard-list"/></svg><span>明日の計画</span></button>
             <span class="bp-progress" id="js-task-progress">0/0</span>
           </div>
         </div>
@@ -327,9 +377,9 @@
         <div class="budget-month-header">
           <span class="budget-month-label" id="js-budget-month-label"></span>
           <div class="budget-header-actions">
-            <button class="btn-receipt" id="js-receipt-btn" title="レシートから読み取り">📷 レシート読取</button>
-            <button class="btn-receipt-key" id="js-jcb-btn" title="JCBメール自動取込の設定">💳</button>
-            <button class="btn-receipt-key" id="js-open-budget-cat-editor" title="カテゴリを編集">🏷</button>
+            <button class="btn-receipt" id="js-receipt-btn" title="レシートから読み取り"><svg class="svg-icon"><use href="#lucide-camera"/></svg><span>レシート読取</span></button>
+            <button class="btn-receipt-key" id="js-jcb-btn" title="JCBメール自動取込の設定"><svg class="svg-icon"><use href="#lucide-credit-card"/></svg></button>
+            <button class="btn-receipt-key" id="js-open-budget-cat-editor" title="カテゴリを編集"><svg class="svg-icon"><use href="#lucide-tag"/></svg></button>
           </div>
         </div>
         <div id="js-budget-summary"></div>
@@ -440,7 +490,7 @@
           </div>
         </div>
         <div class="form-row">
-          <label class="form-label" for="js-ev-reminder">🔔 通知</label>
+          <label class="form-label" for="js-ev-reminder"><svg class="svg-icon"><use href="#lucide-bell"/></svg><span>通知</span></label>
           <select class="form-input" id="js-ev-reminder">
             <option value="">なし</option>
             <option value="5">5分前</option>
@@ -456,7 +506,7 @@
           <div class="cat-chip-list" id="js-cat-chip-list"></div>
         </div>
         <button class="btn-primary" id="js-add-event-btn">＋ 追加</button>
-        <button class="btn-secondary" id="js-ev-repeat-btn" style="margin-top:8px;">📅 曜日を指定して追加</button>
+        <button class="btn-secondary" id="js-ev-repeat-btn" style="margin-top:8px;"><svg class="svg-icon"><use href="#lucide-calendar-days"/></svg><span>曜日を指定して追加</span></button>
       </div>
 
       <!-- Shift form -->
@@ -509,7 +559,7 @@
           <button class="link-btn" id="js-go-to-cat-editor">カテゴリを編集する →</button>
         </div>
         <button class="btn-primary" id="js-add-shift-btn">＋ シフト追加</button>
-        <button class="btn-secondary" id="js-shift-repeat-btn" style="margin-top:8px;">📅 曜日を指定して追加</button>
+        <button class="btn-secondary" id="js-shift-repeat-btn" style="margin-top:8px;"><svg class="svg-icon"><use href="#lucide-calendar-days"/></svg><span>曜日を指定して追加</span></button>
       </div>
     </div>
   </div>
@@ -544,7 +594,7 @@
           </div>
         </div>
         <div class="form-row">
-          <label class="form-label" for="js-edit-ev-reminder">🔔 通知</label>
+          <label class="form-label" for="js-edit-ev-reminder"><svg class="svg-icon"><use href="#lucide-bell"/></svg><span>通知</span></label>
           <select class="form-input" id="js-edit-ev-reminder">
             <option value="">なし</option>
             <option value="5">5分前</option>
@@ -606,7 +656,7 @@
 
     </div>
     <div class="modal-footer">
-      <button class="btn-secondary" id="js-edit-copy-btn" style="margin-right:auto;">📋 他の日にコピー</button>
+      <button class="btn-secondary" id="js-edit-copy-btn" style="margin-right:auto;"><svg class="svg-icon"><use href="#lucide-clipboard-list"/></svg><span>他の日にコピー</span></button>
       <button class="btn-secondary" id="js-edit-cancel-btn">キャンセル</button>
       <button class="btn-primary" style="width:auto;padding:7px 18px;" id="js-edit-save-btn">保存する</button>
     </div>
@@ -654,7 +704,7 @@
         <li>Safari 下部の <strong>共有ボタン（□↑）</strong> をタップ</li>
         <li><strong>「ホーム画面に追加」</strong> を選択</li>
         <li>ホーム画面のアイコンからアプリを開く</li>
-        <li>もう一度「🔔 通知を有効にする」をタップ</li>
+        <li>もう一度「通知を有効にする」をタップ</li>
       </ol>
     </div>
     <div class="modal-footer">
@@ -668,7 +718,7 @@
   <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="js-jcb-title">
     <div class="modal-header">
       <div>
-        <div class="modal-header-title" id="js-jcb-title">💳 JCBメール自動取込</div>
+        <div class="modal-header-title" id="js-jcb-title"><svg class="svg-icon"><use href="#lucide-credit-card"/></svg><span>JCBメール自動取込</span></div>
         <div class="modal-header-sub">利用通知メールの金額を家計簿へ自動登録</div>
       </div>
       <button class="modal-close-btn" id="js-jcb-close" aria-label="閉じる">✕</button>
@@ -766,7 +816,7 @@
   <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="js-receipt-modal-title">
     <div class="modal-header">
       <div>
-        <div class="modal-header-title" id="js-receipt-modal-title">📷 レシート読取</div>
+        <div class="modal-header-title" id="js-receipt-modal-title"><svg class="svg-icon"><use href="#lucide-camera"/></svg><span>レシート読取</span></div>
         <div class="modal-header-sub">レシートを撮影・選択して支出を自動入力</div>
       </div>
       <button class="modal-close-btn" id="js-receipt-modal-close" aria-label="閉じる">✕</button>
@@ -775,7 +825,7 @@
       <!-- Step 1: Upload -->
       <div id="js-receipt-step-upload">
         <div class="receipt-drop-zone" id="js-receipt-drop">
-          <div class="receipt-drop-icon">📷</div>
+          <div class="receipt-drop-icon"><svg class="svg-icon"><use href="#lucide-camera"/></svg></div>
           <div class="receipt-drop-text">タップして撮影・写真を選択</div>
           <div class="receipt-drop-hint">JPG / PNG 対応</div>
         </div>
@@ -784,7 +834,7 @@
           <button class="receipt-preview-clear" id="js-receipt-clear">✕ やり直す</button>
         </div>
         <button class="btn-primary receipt-analyze-btn" id="js-receipt-analyze" style="display:none">
-          🔍 レシートを解析する
+          <svg class="svg-icon"><use href="#lucide-search"/></svg><span>レシートを解析する</span>
         </button>
       </div>
       <!-- Step 2: Loading -->
@@ -807,7 +857,7 @@
           <span class="receipt-total-amount" id="js-receipt-total"></span>
         </div>
         <div class="receipt-actions">
-          <button class="btn-secondary" id="js-receipt-retry">📷 別のレシート</button>
+          <button class="btn-secondary" id="js-receipt-retry"><svg class="svg-icon"><use href="#lucide-camera"/></svg><span>別のレシート</span></button>
           <button class="btn-primary" style="width:auto;padding:8px 20px;" id="js-receipt-save">✓ まとめて追加</button>
         </div>
       </div>
@@ -828,7 +878,7 @@
   <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="js-overtime-cashout-title">
     <div class="modal-header">
       <div>
-        <div class="modal-header-title" id="js-overtime-cashout-title">⏱ 残業を給料に振替</div>
+        <div class="modal-header-title" id="js-overtime-cashout-title"><svg class="svg-icon"><use href="#lucide-timer"/></svg><span>残業を給料に振替</span></div>
         <div class="modal-header-sub" id="js-overtime-cashout-sub"></div>
       </div>
       <button class="modal-close-btn" id="js-overtime-cashout-close" aria-label="閉じる">✕</button>
@@ -870,7 +920,7 @@
   <div class="modal" style="max-width: 360px;">
     <div class="modal-header">
       <div>
-        <div class="modal-header-title" id="js-drink-limit-title">⚠️ 飲み過ぎ注意</div>
+        <div class="modal-header-title" id="js-drink-limit-title"><svg class="svg-icon"><use href="#lucide-alert-triangle"/></svg><span>飲み過ぎ注意</span></div>
       </div>
       <button class="modal-close-btn" id="js-drink-limit-close" aria-label="閉じる">✕</button>
     </div>
@@ -892,7 +942,7 @@
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="js-overtime-history-title">
     <div class="modal-header">
       <div>
-        <div class="modal-header-title" id="js-overtime-history-title">📊 残業の履歴</div>
+        <div class="modal-header-title" id="js-overtime-history-title"><svg class="svg-icon"><use href="#lucide-bar-chart-3"/></svg><span>残業の履歴</span></div>
         <div class="modal-header-sub">月別の残業時間と、給料に振替えた履歴を確認できます</div>
       </div>
       <button class="modal-close-btn" id="js-overtime-history-close" aria-label="閉じる">✕</button>
@@ -909,7 +959,7 @@
   <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="js-daily-plan-modal-title">
     <div class="modal-header">
       <div>
-        <div class="modal-header-title" id="js-daily-plan-modal-title">📋 明日のタスクを計画</div>
+        <div class="modal-header-title" id="js-daily-plan-modal-title"><svg class="svg-icon"><use href="#lucide-clipboard-list"/></svg><span>明日のタスクを計画</span></div>
         <div class="modal-header-sub" id="js-daily-plan-date-label"></div>
       </div>
       <button class="modal-close-btn" id="js-daily-plan-close" aria-label="閉じる">✕</button>

@@ -129,6 +129,11 @@ let _graphData = null;     // 現在の { nodes, edges, adj }
 let _graphMonth = null;    // 組み立て済みの月（'YYYY-MM'）
 let _graphCam = { zoom: 1, tx: 0, ty: 0 };
 let _graphRaf = null;      // 動いているフレームループ / 予約された単発フレーム
+let _graphHover = null;    // ホバー中のノード id（隣接以外を減光する）
+let _graphDrag = null;     // ドラッグ中のノード
+// アクティブなポインタ（pointerId -> 直近の座標）。iOS のピンチは gesture 系が
+// アプリ全体で preventDefault 済み（:3099）なので、2点の距離比で自前に測る。
+let _graphPointers = new Map();
 // canvas は CSS 変数を読めないので getComputedStyle で拾って持つ。捨てるのは applyTheme()。
 let _graphTheme = null;
 
@@ -1428,6 +1433,14 @@ function renderMain() {
     const dt=new Date(y,m+1,d);
     grid.appendChild(buildCell(dt.getFullYear(),dt.getMonth(),d,true,false,narrow));
   }
+
+  // グラフもここで追う。予定の4経路（追加・編集・削除・繰り返し）は renderAll()
+  // を通るので勝手に更新されるが、タスクの変更と予定のドラッグ移動は
+  // renderMain() を直に呼ぶ経路しか持たない。タスクはグラフのノードなので、
+  // これが無いとタスクを足しても消してもグラフだけ古いまま残る。
+  // 現在ビューがグラフのとき renderMain() は renderAll() から呼ばれないので、
+  // 二重描画にはならない。
+  if (currentView === 'graph') renderGraphView();
 }
 
 function sortEvs(arr) {
@@ -3096,6 +3109,11 @@ _narrowMQL.addEventListener('change', applyPlatformClass);
     if (!isMobile()) return;
     // モーダル表示中はエッジスワイプを無効化（暴発防止）
     if (document.querySelector('.overlay.is-open')) { tracking = false; return; }
+    // グラフの上では無効化。このリスナーは document に張ってあるので、
+    // canvas の左端 22px からパンしようとするとサイドバーが開いてしまう。
+    // （パネルのスワイプ移動 initPanelViewSwipe はビュー要素ごとに張るので、
+    //   PANEL_ORDER にグラフを入れなければ何も付かない = そちらは競合しない）
+    if (e.target.closest && e.target.closest('#js-graph-view')) { tracking = false; return; }
     const t = e.touches[0];
     const sidebarOpen = sidebar.classList.contains('is-open');
     fromEdge = !sidebarOpen && t.clientX <= EDGE_ZONE;
@@ -3175,7 +3193,8 @@ const VIEW_ELS = {
   graph:  'js-graph-view',
 };
 
-function switchView(view) {
+// opts.date: 日ビューを「その日」で開く。省略時は従来どおり curDate。
+function switchView(view, opts) {
   if (!VIEW_ELS[view]) return;
   // グラフから離れるならフレームループを止める（停止経路 3）。
   // currentView を書き換える前に見る必要がある。
@@ -3195,7 +3214,10 @@ function switchView(view) {
   // 開いたビューをその場で描く（非表示中は renderAll がゲートするため）。
   if (view === 'month') renderMain();
   if (view === 'day') {
-    dvDate = new Date(curDate);
+    // 呼び出し側が日付を指定したときはそれを開く。無条件に curDate で上書き
+    // していたので、週ビューの日付ヘッダを押しても常に今日が開いていた（実測）。
+    // 呼ぶ前に dvDate へ代入しても switchView がここで捨てるため、渡す形にする。
+    dvDate = opts && opts.date ? new Date(opts.date) : new Date(curDate);
     renderDayView();
   }
   if (view === 'week') {
@@ -3716,7 +3738,7 @@ function renderWeekView() {
       `<span class="wv-head-dow">${DAYS_EN[dow]}</span>` +
       `<span class="wv-head-num${isToday ? ' is-today' : ''}">${d.getDate()}</span>` +
       (holidayName ? `<span class="wv-head-holiday">${escHtml(holidayName)}</span>` : '');
-    head.addEventListener('click', () => { dvDate = new Date(d); switchView('day'); });
+    head.addEventListener('click', () => switchView('day', { date: d }));
     headsEl.appendChild(head);
   });
 
@@ -6147,38 +6169,62 @@ function _graphDraw() {
   const sx = n => n.x * cam.zoom + cam.tx;
   const sy = n => n.y * cam.zoom + cam.ty;
 
-  // エッジ。色は1種類なので1本のパスにまとめて stroke は1回だけ。
+  // ホバー中は、その点と隣接だけを残して他を沈める（Obsidian と同じ）。
+  // focus が null のときは全部が主役。
+  const focus = _graphHover && _graphData.adj.has(_graphHover)
+    ? new Set([_graphHover, ..._graphData.adj.get(_graphHover)])
+    : null;
+  const DIM = 0.25;
+  const lit = id => !focus || focus.has(id);
+
+  // エッジ。色は1種類なので、明るい束と沈めた束の2パスで済む。stroke は2回。
+  const byId = new Map(nodes.map(n => [n.id, n]));
+  const strokeEdges = want => {
+    ctx.beginPath();
+    let any = false;
+    for (const e of edges) {
+      // 線が主役なのは両端が focus のときだけ。片端だけの線を明るくすると
+      // 隣接の隣接まで繋がって見え、減光の意味が消える。
+      const on = !focus || (focus.has(e.source) && focus.has(e.target));
+      if (on !== want) continue;
+      const a = byId.get(e.source), b = byId.get(e.target);
+      if (!a || !b) continue;
+      ctx.moveTo(sx(a), sy(a));
+      ctx.lineTo(sx(b), sy(b));
+      any = true;
+    }
+    if (any) ctx.stroke();
+  };
   ctx.strokeStyle = th.line;
   ctx.lineWidth = Math.max(0.5, 1 * cam.zoom);
-  ctx.globalAlpha = 0.6;
-  ctx.beginPath();
-  const byId = new Map(nodes.map(n => [n.id, n]));
-  for (const e of edges) {
-    const a = byId.get(e.source), b = byId.get(e.target);
-    if (!a || !b) continue;
-    ctx.moveTo(sx(a), sy(a));
-    ctx.lineTo(sx(b), sy(b));
-  }
-  ctx.stroke();
-  ctx.globalAlpha = 1;
+  ctx.globalAlpha = 0.6 * DIM; strokeEdges(false);
+  ctx.globalAlpha = 0.6;       strokeEdges(true);
 
   // ノード
   for (const n of nodes) {
-    ctx.fillStyle = graphNodeColor(n, th);
+    ctx.globalAlpha = lit(n.id) ? 1 : DIM;
+    ctx.fillStyle = n.id === _graphHover ? th.focused : graphNodeColor(n, th);
     ctx.beginPath();
     ctx.arc(sx(n), sy(n), Math.max(1, n.r * cam.zoom), 0, Math.PI * 2);
     ctx.fill();
   }
+  ctx.globalAlpha = 1;
 
   // ラベル。ズームが浅いと潰れるので出さない（Obsidian の text fade と同じ考え）。
+  // ただしホバー中の点とその隣接だけは、ズームに関係なく必ず読ませる —
+  // 引いた状態で「この日に何がぶら下がっているか」を見るのがこのビューの用途で、
+  // そこで名前が消えていては用を成さない。
   const fade = cam.zoom < 0.55 ? 0 : cam.zoom > 0.9 ? 1 : (cam.zoom - 0.55) / 0.35;
-  if (fade > 0) {
-    ctx.globalAlpha = fade;
+  if (fade > 0 || focus) {
     ctx.fillStyle = th.text;
     ctx.font = '11px ' + getComputedStyle(document.body).fontFamily;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     for (const n of nodes) {
+      const forced = focus && focus.has(n.id);
+      const a = forced ? 1 : (focus ? fade * DIM : fade);
+      if (a <= 0) continue;
+      ctx.globalAlpha = a;
       const label = n.label.length > 18 ? n.label.slice(0, 17) + '…' : n.label;
       ctx.fillText(label, sx(n), sy(n) + n.r * cam.zoom + 3);
     }
@@ -6261,6 +6307,11 @@ function renderGraphView() {
   const mk = formatYM(curDate);
   const monthChanged = _graphMonth !== mk || !_graphData;
 
+  // 作り直す前に今の座標を控える。データが変わるたびに buildGraph が新しい
+  // ノードを作り、createSim の initLayout が x/y を上書きするので、そのままだと
+  // 予定のタイトルを1文字直しただけでグラフ全体が別の配置に飛ぶ。
+  const prev = new Map((_graphSim ? _graphSim.nodes : []).map(n => [n.id, n]));
+
   _graphData = graphModel.buildGraph({
     year: curDate.getFullYear(),
     month: curDate.getMonth(),
@@ -6270,6 +6321,17 @@ function renderGraphView() {
   });
   _graphMonth = mk;
   _graphSim = graphForce.createSim(_graphData);
+  _graphHover = null;                 // 古い id は消えているかもしれない
+  _graphDrag = null;
+
+  if (!monthChanged) {
+    // 見覚えのある点は元の場所に戻す。新顔だけが phyllotaxis の初期位置から
+    // 動き出し、リヒートで周りが少しずれて馴染む。
+    for (const n of _graphSim.nodes) {
+      const p = prev.get(n.id);
+      if (p) { n.x = p.x; n.y = p.y; n.vx = p.vx; n.vy = p.vy; }
+    }
+  }
 
   const s = _graphResize();
   if (monthChanged) {
@@ -6284,3 +6346,161 @@ function renderGraphView() {
     _graphDraw();
   }
 }
+
+// ── interaction ──────────────────────────────────────────────────────────────
+// Pointer Events で統一する（このアプリで初）。iOS のピンチを gesturestart で
+// 取れないのは、アプリ全体が拡大抑止のために preventDefault しているため
+// （initPinchGuard）。なのでアクティブなポインタを自分で Map に持ち、
+// 2点になったら距離比でズームする。canvas の touch-action:none が前提で、
+// これが無いとブラウザがスクロールと判断した時点で pointermove が来なくなる。
+
+// ノードを開く。Obsidian のグラフと同じで、点はその対象への入口。
+function openGraphNode(n) {
+  if (!n) return;
+  if (n.kind === 'date') {
+    const [y, m, d] = n.key.split('-').map(Number);
+    switchView('day', { date: new Date(y, m - 1, d) });
+  } else if (n.kind === 'event') {
+    openEditModal(n.ref, n.key);          // G0 で日付を引数で渡せるようにした
+  } else if (n.kind === 'task') {
+    switchView('task');
+  } else if (n.kind === 'cat') {
+    openSettings('cat');
+  }
+}
+
+(function initGraphInteraction() {
+  const cv = _graphCanvas();
+  if (!cv) return;
+
+  // 6px 未満の移動はクリック。マウスの慣習は5px、指のぶれは8px 前後なので
+  // その間。既存のスワイプ閾値50px（サイドバー・パネル移動）とは無関係。
+  const CLICK_SLOP = 6;
+  const HIT_SLOP = 6;                     // 指で小さい点を掴めるようにする余白
+
+  let mode = null;                        // 'node' | 'pan' | 'pinch' | null
+  let downX = 0, downY = 0, moved = 0;
+  let panFrom = null, pinchFrom = null;
+
+  const local = e => {
+    const r = cv.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  };
+  const nodeAt = p => {
+    if (!_graphData) return null;
+    const w = graphForce.screenToWorld(_graphCam, p.x, p.y);
+    // 当たり判定の余白は world 単位。引くほど点は小さく見えるので、
+    // 見た目6px 相当になるようズームで割る。
+    return graphModel.hitTest(_graphData.nodes, w.x, w.y, HIT_SLOP / _graphCam.zoom);
+  };
+  const setHover = id => {
+    if (id === _graphHover) return;
+    _graphHover = id;
+    cv.style.cursor = id ? 'pointer' : '';
+    requestGraphRedraw();
+  };
+  const dropDrag = () => {
+    if (!_graphDrag) return;
+    _graphDrag.fixed = false;             // 物理に返す
+    _graphDrag = null;
+    _graphReheat(0.3);
+  };
+
+  cv.addEventListener('pointerdown', e => {
+    if (currentView !== 'graph') return;
+    _graphPointers.set(e.pointerId, local(e));
+    try { cv.setPointerCapture(e.pointerId); } catch (_) {}
+
+    if (_graphPointers.size === 2) {
+      const [a, b] = [..._graphPointers.values()];
+      pinchFrom = { dist: Math.hypot(a.x - b.x, a.y - b.y), zoom: _graphCam.zoom };
+      dropDrag();                         // 2本目が乗ったらドラッグは畳む
+      mode = 'pinch';
+      return;
+    }
+    if (_graphPointers.size > 2) return;
+
+    const p = local(e);
+    downX = p.x; downY = p.y; moved = 0;
+    const n = nodeAt(p);
+    if (n) {
+      _graphDrag = n;
+      n.fixed = true;
+      setHover(n.id);                     // 指では pointermove が無いので掴んだ時に光らせる
+      mode = 'node';
+      _graphReheat(0.3);
+    } else {
+      mode = 'pan';
+      panFrom = { x: p.x, y: p.y, tx: _graphCam.tx, ty: _graphCam.ty };
+    }
+  });
+
+  cv.addEventListener('pointermove', e => {
+    const p = local(e);
+    if (_graphPointers.has(e.pointerId)) _graphPointers.set(e.pointerId, p);
+
+    if (mode === 'pinch') {
+      if (_graphPointers.size < 2 || !pinchFrom || pinchFrom.dist <= 0) return;
+      const [a, b] = [..._graphPointers.values()];
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      const want = graphForce.clampZoom(pinchFrom.zoom * (d / pinchFrom.dist));
+      _graphCam = graphForce.zoomAt(_graphCam, mid.x, mid.y, want / _graphCam.zoom);
+      requestGraphRedraw();
+      return;
+    }
+
+    if (mode !== null) moved = Math.max(moved, Math.hypot(p.x - downX, p.y - downY));
+
+    if (mode === 'node' && _graphDrag) {
+      const w = graphForce.screenToWorld(_graphCam, p.x, p.y);
+      _graphDrag.x = w.x; _graphDrag.y = w.y;
+      _graphDrag.vx = 0; _graphDrag.vy = 0;
+      _graphReheat(0.3);                  // 掴んでいる間は周りが追従し続ける
+    } else if (mode === 'pan' && panFrom) {
+      _graphCam = { zoom: _graphCam.zoom, tx: panFrom.tx + (p.x - panFrom.x), ty: panFrom.ty + (p.y - panFrom.y) };
+      requestGraphRedraw();
+    } else if (mode === null) {
+      setHover(nodeAt(p)?.id ?? null);
+    }
+  });
+
+  const release = e => {
+    _graphPointers.delete(e.pointerId);
+    try { if (cv.hasPointerCapture(e.pointerId)) cv.releasePointerCapture(e.pointerId); } catch (_) {}
+  };
+
+  cv.addEventListener('pointerup', e => {
+    const wasMode = mode;
+    const hit = _graphDrag;
+    const wasClick = moved < CLICK_SLOP;
+    release(e);
+    dropDrag();
+    if (_graphPointers.size === 0) { mode = null; panFrom = null; pinchFrom = null; }
+    else if (mode === 'pinch') return;    // まだ指が残っている
+
+    // 指はホバーを残さない（マウスは動かせば pointermove が消してくれる）
+    if (e.pointerType !== 'mouse') setHover(null);
+
+    if (!wasClick || wasMode === 'pinch') return;
+    if (wasMode === 'node' && hit) openGraphNode(hit);
+  });
+
+  cv.addEventListener('pointercancel', e => {
+    release(e);
+    dropDrag();
+    if (_graphPointers.size === 0) { mode = null; panFrom = null; pinchFrom = null; }
+  });
+
+  cv.addEventListener('pointerleave', () => { if (mode === null) setHover(null); });
+
+  // ホイールズーム。カーソルの下の点を動かさない。passive:false でないと
+  // preventDefault が効かず、ページごとスクロールする。
+  cv.addEventListener('wheel', e => {
+    if (currentView !== 'graph') return;
+    e.preventDefault();
+    const p = local(e);
+    _graphCam = graphForce.zoomAt(_graphCam, p.x, p.y, Math.exp(-e.deltaY * 0.0015));
+    requestGraphRedraw();
+  }, { passive: false });
+})();

@@ -3864,6 +3864,46 @@ document.getElementById('js-wv-add').addEventListener('click', () => {
   el.addEventListener('touchend', () => { tracking = false; }, { passive: true });
 })();
 
+// ── Swipe navigation (家計簿 / 目標 / タスク) ─────────────────────────────────
+// 右スプリット時代にあった左右スワイプでのタブ移動を、タブ構成のまま取り戻す。
+// 月/週/日の左右スワイプは「前後の期間へ」で、ビュー要素にスコープされている
+// （#js-month-view など）。こちらも同じく3つのパネルビューにだけ付けるので、
+// 同じ指の動きでも当たる相手が違い、競合しない。
+// 上下の3段階スワイプ（peek/mid/expanded）は復活させない — 下シートそのものが
+// 無くなったので掴む対象が存在しない。
+(function initPanelViewSwipe() {
+  const PANEL_ORDER = ['budget', 'goal', 'task'];
+  const EDGE_ZONE = 22;   // 左端はサイドバーのエッジスワイプに譲る
+  PANEL_ORDER.forEach(view => {
+    const el = document.getElementById(VIEW_ELS[view]);
+    if (!el) return;
+    let startX = 0, startY = 0, tracking = false, swiped = false;
+    el.addEventListener('touchstart', e => {
+      if (document.querySelector('.overlay.is-open')) { tracking = false; return; }
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      tracking = startX > EDGE_ZONE;
+      swiped = false;
+    }, { passive: true });
+    el.addEventListener('touchmove', e => {
+      if (!tracking || swiped) return;
+      const dx = e.touches[0].clientX - startX;
+      const dy = e.touches[0].clientY - startY;
+      if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+        swiped = true;                       // 1ジェスチャ＝1タブ移動
+        tracking = false;
+        e.preventDefault();
+        const idx = PANEL_ORDER.indexOf(view);
+        // 左スワイプ（dx<0）= 次のタブ、右スワイプ = 前のタブ。端では循環しない。
+        const next = dx < 0 ? idx + 1 : idx - 1;
+        if (next < 0 || next >= PANEL_ORDER.length) return;
+        switchView(PANEL_ORDER[next]);
+      }
+    }, { passive: false });
+    el.addEventListener('touchend', () => { tracking = false; }, { passive: true });
+  });
+})();
+
 
 function _pad2(n){ return String(n).padStart(2,'0'); }
 

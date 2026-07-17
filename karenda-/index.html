@@ -1137,7 +1137,12 @@
 <!-- 非ブロッキング通知トースト（ネイティブ alert の代替）-->
 <div class="app-toast" id="js-app-toast" role="status" aria-live="polite"></div>
 
+<!-- lib/* は純粋関数のみ（DOM / Supabase 非依存）。app.js より前に読むこと。
+     同じファイルを node --test が require するので、ここと tests/ で実装は一つ。 -->
 <script src="lib/date-utils.js"></script>
+<script src="lib/md-inline.js"></script>
+<script src="lib/md-daily.js"></script>
+<script src="lib/md-note.js"></script>
 <script src="app.js"></script>
 <script src="app-init.js"></script>
 </body>

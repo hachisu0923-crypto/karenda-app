@@ -294,6 +294,21 @@ body {
   --nav-collapse-icon-color:   var(--text-faint);
   --icon-color: var(--text-muted);
 
+  /* — Links / tags (Obsidian の実トークン) — */
+  --link-color:      var(--text-accent);
+  --link-decoration: underline;
+  --link-weight:     var(--font-weight);
+  --tag-color:            var(--text-accent);
+  --tag-background:       hsla(var(--interactive-accent-hsl), 0.1);
+  --tag-border-color:     hsla(var(--interactive-accent-hsl), 0.15);
+  --tag-border-width:     0px;
+  --tag-decoration:       none;
+  --tag-weight:           inherit;
+  --tag-radius:           2em;
+  --tag-padding-x:        0.65em;
+  --tag-padding-y:        0.25em;
+  --tag-size:             var(--font-smaller, 0.875em);
+
   /* — Scrollbar — */
   --scrollbar-bg:              rgba(var(--mono-rgb-100), 0.05);
   --scrollbar-thumb-bg:        rgba(var(--mono-rgb-100), 0.1);
@@ -406,6 +421,44 @@ body {
 
 /* ボタン等でアイコンとラベルを並べるときの既定の間隔 */
 .svg-icon + span { margin-left: var(--size-4-1); }
+
+/* ============================================================
+   INLINE MARKUP — [[wikilink]] と #tag（lib/md-inline.js が出力）
+   クラス名は Obsidian の実クラス。ブラウザには開く vault が無いので、
+   リンクは装飾のみでクリックできない（cursor も変えない）。
+   ============================================================ */
+.internal-link {
+  color: var(--link-color);
+  text-decoration: var(--link-decoration);
+  text-decoration-thickness: var(--link-decoration-thickness, auto);
+  font-weight: var(--link-weight);
+}
+.cm-hashtag {
+  color: var(--tag-color);
+  background-color: var(--tag-background);
+  border: var(--tag-border-width) solid var(--tag-border-color);
+  border-radius: var(--tag-radius);
+  font-size: var(--tag-size);
+  font-weight: var(--tag-weight);
+  text-decoration: var(--tag-decoration);
+  padding: var(--tag-padding-y) var(--tag-padding-x);
+  line-height: 1;
+  white-space: nowrap;
+}
+/* 月セルのピルは極小・色地なので、タグの地色と余白は邪魔になる。
+   Obsidian もタグの見せ方をコンテキストごとにトークンで変える。
+   色は currentColor（ピルの文字色）に合わせる。ここで `inherit` を使うと
+   CSS 全体キーワードとして解釈され、トークンの値ではなく「親の --link-color
+   を継承する」意味になってアクセント色のままになる。 */
+.event-pill .cm-hashtag,
+.event-pill .internal-link {
+  --tag-background: transparent;
+  --tag-padding-x: 0;
+  --tag-padding-y: 0;
+  --tag-color: currentColor;
+  --link-color: currentColor;
+  opacity: 0.75;
+}
 
 /* 大きく見せる箇所だけ上書き（もとは font-size で絵文字を拡大していた）。
    SVG は font-size に反応しないので、この上書きが無いと縮んで見える。 */

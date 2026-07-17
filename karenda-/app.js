@@ -1475,15 +1475,15 @@ function buildCell(y,m,d,isOther,isToday,narrow) {
         if (narrow) {
           // 2段表示：1段目に開始時刻、2段目に予定タイトル（終日は時刻なしで名前のみ）
           pill.innerHTML= ev.time
-            ? `<span class="event-pill-time">${ev.time}</span><span class="event-pill-name">${escHtml(ev.title)}</span>`
-            : `<span class="event-pill-name">${escHtml(ev.title)}</span>`;
+            ? `<span class="event-pill-time">${ev.time}</span><span class="event-pill-name">${renderInline(ev.title)}</span>`
+            : `<span class="event-pill-name">${renderInline(ev.title)}</span>`;
         } else {
           const pillTime = ev.time
             ? (ev.timeEnd ? `${ev.time}–${ev.timeEnd}` : ev.time)
             : '';
           pill.innerHTML=pillTime
-            ?`<span class="event-pill-time">${pillTime}</span><span class="event-pill-name">${escHtml(ev.title)}</span>`
-            :`<span class="event-pill-dot"></span><span class="event-pill-name">${escHtml(ev.title)}</span>`;
+            ?`<span class="event-pill-time">${pillTime}</span><span class="event-pill-name">${renderInline(ev.title)}</span>`
+            :`<span class="event-pill-dot"></span><span class="event-pill-name">${renderInline(ev.title)}</span>`;
         }
       }
       pill.addEventListener('click',e=>{e.stopPropagation();openDayModal(y,m,d);});
@@ -1693,7 +1693,7 @@ function renderExistingEvents() {
                 <span>${brk}${otTag}勤務 ${fmtMin(workMinutes)}</span>
                 <span class="ev-shift-pay">${fmtYen(pay)}</span>`;
     } else {
-      titleHtml=escHtml(ev.title);
+      titleHtml=renderInline(ev.title);
       const tRange = ev.time
         ? (ev.timeEnd ? `${ev.time} – ${ev.timeEnd}` : ev.time)
         : '';

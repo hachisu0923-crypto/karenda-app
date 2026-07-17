@@ -1,6 +1,7 @@
 'use strict';
 // Tests for the shared pure date helpers used by karenda-/app.js.
 // Run: node --test tests/date-utils.test.js
+// (all: node --test tests/*.test.js — a bare tests/ is resolved as a module and fails)
 const test = require('node:test');
 const assert = require('node:assert');
 const { shiftMonthDate, monthKeyFromDate } = require('../karenda-/lib/date-utils.js');

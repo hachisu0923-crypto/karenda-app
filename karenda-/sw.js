@@ -1,5 +1,5 @@
 // My Calendar - Service Worker
-const CACHE_NAME = 'my-calendar-v21';
+const CACHE_NAME = 'my-calendar-v22';
 
 // インストール時：基本ファイルをキャッシュ
 self.addEventListener('install', e => {

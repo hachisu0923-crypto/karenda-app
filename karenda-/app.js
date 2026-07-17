@@ -128,6 +128,7 @@ let _graphSim = null;      // 現在のシミュレーション
 let _graphData = null;     // 現在の { nodes, edges, adj }
 let _graphMonth = null;    // 組み立て済みの月（'YYYY-MM'）
 let _graphCam = { zoom: 1, tx: 0, ty: 0 };
+let _graphRaf = null;      // 動いているフレームループ / 予約された単発フレーム
 // canvas は CSS 変数を読めないので getComputedStyle で拾って持つ。捨てるのは applyTheme()。
 let _graphTheme = null;
 
@@ -3176,6 +3177,9 @@ const VIEW_ELS = {
 
 function switchView(view) {
   if (!VIEW_ELS[view]) return;
+  // グラフから離れるならフレームループを止める（停止経路 3）。
+  // currentView を書き換える前に見る必要がある。
+  if (currentView === 'graph' && view !== 'graph') _graphStopLoop();
   currentView = view;
   for (const [k, id] of Object.entries(VIEW_ELS)) {
     const el = document.getElementById(id);
@@ -6183,12 +6187,79 @@ function _graphDraw() {
 }
 
 // グラフを組み直す。月が変わったときだけレイアウトを取り直す。
+// ── frame loop ───────────────────────────────────────────────────────────────
+// このアプリで唯一の継続的な rAF。回りっぱなしは PWA のバッテリーを直接削るので、
+// 止まる経路を4つ持つ:
+//   1. alpha が収束したら自分で止まる（最後のフレームは canvas に残る）
+//   2. タブが裏に回ったら止まる（visibilitychange）
+//   3. グラフ以外のビューへ移ったら止まる（switchView から）
+//   4. 収束後のホバー等は単発フレームを1枚だけ予約する（ループは回さない）
+function _graphStopLoop() {
+  if (_graphRaf != null) { cancelAnimationFrame(_graphRaf); _graphRaf = null; }
+}
+
+// 予約されるフレームはこの1種類だけ。「ループの1コマ」と「単発の描き直し」を
+// 別の関数に分けると、_graphRaf を奪い合って事故る: 単発が予約済みのときに
+// リヒートが来ると _graphStartLoop が「もう予約がある」と諦め、単発は1枚描いて
+// 終わるのでループが二度と回らず、alpha だけ上がってレイアウトが凍る。
+// 分岐を予約時ではなく実行時に置けば、フレームは自分が走る瞬間の状態を見て
+// 続けるか止まるかを決められる。
+function _graphFrame() {
+  _graphRaf = null;
+  if (currentView !== 'graph' || document.hidden) return;    // 経路 2・3
+  const running = _graphSim && !graphForce.isSettled(_graphSim);
+  if (running) graphForce.tick(_graphSim);
+  _graphDraw();
+  if (running && !graphForce.isSettled(_graphSim)) {
+    _graphRaf = requestAnimationFrame(_graphFrame);           // 続ける
+  }
+  // 収束済み = 経路 4（1枚描いて終わり）／収束した = 経路 1
+}
+
+function _graphStartLoop() {
+  if (_graphRaf != null) return;                              // 二重起動しない
+  if (currentView !== 'graph' || document.hidden) return;
+  _graphRaf = requestAnimationFrame(_graphFrame);
+}
+
+// 収束後に1枚だけ描き直す（ホバー・パン・ズーム用）。alpha を上げないので
+// _graphFrame は running=false で走り、1枚描いて止まる。
+function requestGraphRedraw() { _graphStartLoop(); }
+
+// ドラッグ・データ変更・リサイズ・月移動でレイアウトを温め直す。
+function _graphReheat(to) {
+  if (!_graphSim) return;
+  graphForce.reheat(_graphSim, to);
+  _graphStartLoop();
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) _graphStopLoop();                      // 経路 2
+  else if (currentView === 'graph' && _graphSim && !graphForce.isSettled(_graphSim)) _graphStartLoop();
+});
+
+// サイドバー開閉・画面回転・ツールバーの出入りでキャンバスの寸法が変わる。
+// display:none の間は 0x0 が来るので、そのときは何もしない。
+(function initGraphResizeObserver() {
+  const view = document.getElementById('js-graph-view');
+  if (!view || typeof ResizeObserver === 'undefined') return;
+  let last = { w: 0, h: 0 };
+  new ResizeObserver(entries => {
+    const r = entries[0].contentRect;
+    if (r.width === 0 || r.height === 0) return;              // 非表示
+    if (Math.round(r.width) === last.w && Math.round(r.height) === last.h) return;
+    last = { w: Math.round(r.width), h: Math.round(r.height) };
+    if (currentView !== 'graph') return;
+    requestGraphRedraw();
+  }).observe(view);
+})();
+
 function renderGraphView() {
   const view = document.getElementById('js-graph-view');
   if (!view) return;
 
   const mk = formatYM(curDate);
-  const rebuild = _graphMonth !== mk || !_graphData;
+  const monthChanged = _graphMonth !== mk || !_graphData;
 
   _graphData = graphModel.buildGraph({
     year: curDate.getFullYear(),
@@ -6198,11 +6269,18 @@ function renderGraphView() {
     tasks: (typeof _taskState !== 'undefined' && _taskState) ? _taskState.tasks : [],
   });
   _graphMonth = mk;
-
   _graphSim = graphForce.createSim(_graphData);
-  graphForce.settle(_graphSim);
 
   const s = _graphResize();
-  if (s && rebuild) _graphCam = graphForce.fitToView(_graphData.nodes, s.w, s.h);
-  _graphDraw();
+  if (monthChanged) {
+    // 新しい月は落ち着いた状態から見せたい（ノードが飛び回るのを見せない）。
+    // 190ノードでも実測 16ms なので、同期で収束させてから1枚描く。
+    graphForce.settle(_graphSim);
+    if (s) _graphCam = graphForce.fitToView(_graphData.nodes, s.w, s.h);
+    _graphDraw();
+  } else {
+    // 同じ月の中の変更（予定を編集した等）は、その場から動かして馴染ませる。
+    _graphReheat(0.3);
+    _graphDraw();
+  }
 }

@@ -2,81 +2,152 @@
 // Tests for the graph view's model — which nodes exist and what links them.
 // Run: node --test tests/graph-model.test.js
 // (all: node --test tests/*.test.js — a bare tests/ is resolved as a module and fails)
+//
+// The graph is scoped to a window of days (the app passes today and 7), not to a
+// month. Every test below fixes the window explicitly rather than deriving it
+// from the clock: a model that read new Date() must fail here, not next week.
 const test = require('node:test');
 const assert = require('node:assert');
-const { buildGraph, nodeRadius, hitTest } = require('../karenda-/lib/graph-model.js');
+const { buildGraph, nodeRadius, hitTest, WINDOW_DAYS } = require('../karenda-/lib/graph-model.js');
 
 const CATS = [
   { id: 'c1', name: '仕事', color: '#4772b3' },
   { id: 's1', name: 'バイト', color: '#e9973f', type: 'shift', hourlyWage: 1200 },
   { id: 'c9', name: '使われないカテゴリ', color: '#888888' },
 ];
-const Y = 2026, M = 6;                       // July 2026 (month is 0-based)
 const k = d => `2026-07-${String(d).padStart(2, '0')}`;
-const build = o => buildGraph(Object.assign({ year: Y, month: M, categories: CATS, events: {}, tasks: [] }, o));
+const START = k(17);                         // the window used by most tests: 7/17–7/23
+const IN = k(18);                            // a day inside it that is not the start
+const build = o => buildGraph(Object.assign(
+  { start: START, days: 7, categories: CATS, events: {}, tasks: [] }, o));
 const ids = g => g.nodes.map(n => n.id);
 const kindOf = (g, kind) => g.nodes.filter(n => n.kind === kind);
+const dayKeys = g => kindOf(g, 'date').map(n => n.key);
+const edge = (g, a, b) => g.edges.find(e => (e.source === a && e.target === b) || (e.source === b && e.target === a));
 
-// ── day nodes ────────────────────────────────────────────────────────────────
+// ── the window itself ────────────────────────────────────────────────────────
+// "その日から7日以内の予定だけを表示して" — today plus the six days after it.
 
-test('every day of the month becomes a node, including empty ones', () => {
+test('the window is exactly `days` consecutive days starting at start', () => {
   const g = build({});
-  const days = kindOf(g, 'date');
-  assert.strictEqual(days.length, 31, 'July has 31 days');
-  assert.ok(ids(g).includes('date:2026-07-01'));
-  assert.ok(ids(g).includes('date:2026-07-31'));
+  assert.deepStrictEqual(dayKeys(g),
+    [k(17), k(18), k(19), k(20), k(21), k(22), k(23)],
+    `a 7-day window from ${START} must run to ${k(23)}; got [${dayKeys(g).join(', ')}]`);
 });
 
-test('February 2024 gets 29 day nodes (leap year)', () => {
-  const g = buildGraph({ year: 2024, month: 1, categories: CATS, events: {}, tasks: [] });
-  assert.strictEqual(kindOf(g, 'date').length, 29);
+test('every day in the window becomes a node, including empty ones', () => {
+  // An empty day is information (it is a gap). Dropping it would make the week
+  // look busier than it is.
+  const g = build({ events: { [IN]: [{ _dbId: 1, catId: 'c1', title: 'A' }] } });
+  assert.strictEqual(kindOf(g, 'date').length, 7,
+    `six empty days must still be nodes; got ${kindOf(g, 'date').length}`);
 });
 
-test('February 2026 gets 28 day nodes', () => {
-  const g = buildGraph({ year: 2026, month: 1, categories: CATS, events: {}, tasks: [] });
-  assert.strictEqual(kindOf(g, 'date').length, 28);
+test('days defaults to 7 when the caller omits it', () => {
+  const g = buildGraph({ start: START, categories: CATS, events: {}, tasks: [] });
+  assert.strictEqual(kindOf(g, 'date').length, 7, `the default window is a week, got ${kindOf(g, 'date').length}`);
+  assert.strictEqual(WINDOW_DAYS, 7, `WINDOW_DAYS must be the same 7 the app passes, got ${WINDOW_DAYS}`);
+});
+
+test('a window that crosses into the next month stays consecutive', () => {
+  // The month scope this replaced could not do this. Events and tasks are held
+  // for all time with no date filter, so August's records are already to hand.
+  const g = buildGraph({ start: '2026-07-28', days: 7, categories: CATS, events: {}, tasks: [] });
+  assert.deepStrictEqual(dayKeys(g),
+    ['2026-07-28', '2026-07-29', '2026-07-30', '2026-07-31', '2026-08-01', '2026-08-02', '2026-08-03'],
+    `7/28 + 7 days must roll over into August; got [${dayKeys(g).join(', ')}]`);
+});
+
+test('a window crossing the end of a leap February runs through the 29th', () => {
+  const g = buildGraph({ start: '2024-02-26', days: 7, categories: CATS, events: {}, tasks: [] });
+  assert.deepStrictEqual(dayKeys(g),
+    ['2024-02-26', '2024-02-27', '2024-02-28', '2024-02-29', '2024-03-01', '2024-03-02', '2024-03-03'],
+    `2024 is a leap year, so 2/29 must be in the window; got [${dayKeys(g).join(', ')}]`);
+});
+
+test('a window crossing the end of a common February skips from the 28th to March', () => {
+  const g = buildGraph({ start: '2026-02-26', days: 7, categories: CATS, events: {}, tasks: [] });
+  assert.deepStrictEqual(dayKeys(g),
+    ['2026-02-26', '2026-02-27', '2026-02-28', '2026-03-01', '2026-03-02', '2026-03-03', '2026-03-04'],
+    `2026 is not a leap year, so there must be no 2/29; got [${dayKeys(g).join(', ')}]`);
+});
+
+test('a window crossing a year end rolls the year over', () => {
+  const g = buildGraph({ start: '2026-12-29', days: 7, categories: CATS, events: {}, tasks: [] });
+  assert.deepStrictEqual(dayKeys(g),
+    ['2026-12-29', '2026-12-30', '2026-12-31', '2027-01-01', '2027-01-02', '2027-01-03', '2027-01-04'],
+    `the window must continue into 2027; got [${dayKeys(g).join(', ')}]`);
+});
+
+test('a day node is labelled with its day of the month, restarting at 1 mid-window', () => {
+  const g = buildGraph({ start: '2026-07-30', days: 3, categories: CATS, events: {}, tasks: [] });
+  assert.deepStrictEqual(kindOf(g, 'date').map(n => n.label), ['30', '31', '1'],
+    'the label is the day of the month, as the month grid writes it');
 });
 
 // ── events ───────────────────────────────────────────────────────────────────
 
 test('an event links to its day and its category', () => {
-  const g = build({ events: { [k(3)]: [{ _dbId: 1, catId: 'c1', title: '定例' }] } });
+  const g = build({ events: { [IN]: [{ _dbId: 1, catId: 'c1', title: '定例' }] } });
   const e = g.nodes.find(n => n.id === 'event:1');
   assert.strictEqual(e.label, '定例');
   assert.strictEqual(e.color, '#4772b3');
-  assert.deepStrictEqual([...g.adj.get('event:1')].sort(), ['cat:c1', 'date:2026-07-03']);
+  assert.deepStrictEqual([...g.adj.get('event:1')].sort(), ['cat:c1', 'date:2026-07-18']);
 });
 
 test('a shift is labelled with its category name, since its title is empty', () => {
   // app.js does the same fallback in the month cell: ev.title || cat.name
-  const g = build({ events: { [k(3)]: [{ _dbId: 2, catId: 's1', title: '', shiftStart: '17:00' }] } });
+  const g = build({ events: { [IN]: [{ _dbId: 2, catId: 's1', title: '', shiftStart: '17:00' }] } });
   assert.strictEqual(g.nodes.find(n => n.id === 'event:2').label, 'バイト');
 });
 
 test('an event with an unknown catId does not throw and gets no colour', () => {
-  const g = build({ events: { [k(3)]: [{ _dbId: 3, catId: 'nope', title: 'X' }] } });
+  const g = build({ events: { [IN]: [{ _dbId: 3, catId: 'nope', title: 'X' }] } });
   const e = g.nodes.find(n => n.id === 'event:3');
   assert.strictEqual(e.color, null, 'the view picks a fallback; the model must not invent one');
-  assert.deepStrictEqual([...g.adj.get('event:3')], ['date:2026-07-03'], 'no category edge');
+  assert.deepStrictEqual([...g.adj.get('event:3')], ['date:2026-07-18'], 'no category edge');
 });
 
 test('an event with no title and no category still gets a label', () => {
-  const g = build({ events: { [k(3)]: [{ _dbId: 4, catId: 'nope', title: '' }] } });
+  const g = build({ events: { [IN]: [{ _dbId: 4, catId: 'nope', title: '' }] } });
   assert.strictEqual(g.nodes.find(n => n.id === 'event:4').label, '(無題)');
 });
 
-test('events from other months are ignored', () => {
-  const g = build({ events: { '2026-08-03': [{ _dbId: 5, catId: 'c1', title: '来月' }] } });
-  assert.strictEqual(kindOf(g, 'event').length, 0);
+test('an event on the day before the window is ignored', () => {
+  const g = build({ events: { [k(16)]: [{ _dbId: 5, catId: 'c1', title: '昨日' }] } });
+  assert.strictEqual(kindOf(g, 'event').length, 0,
+    `${k(16)} is one day before ${START} and must not appear`);
+});
+
+test('an event on the day after the window is ignored', () => {
+  const g = build({ events: { [k(24)]: [{ _dbId: 6, catId: 'c1', title: '来週' }] } });
+  assert.strictEqual(kindOf(g, 'event').length, 0,
+    `${k(24)} is start+7 and must not appear; the window ends at ${k(23)}`);
+});
+
+test('an event on the last day of the window is kept', () => {
+  // The boundary the test above guards from the other side: start+days-1 is in.
+  const g = build({ events: { [k(23)]: [{ _dbId: 7, catId: 'c1', title: '最終日' }] } });
+  assert.deepStrictEqual([...g.adj.get('event:7')].sort(), ['cat:c1', 'date:2026-07-23']);
+});
+
+test('an event in the next month is kept when the window reaches it', () => {
+  // The month scope dropped this one. It is the whole point of the change.
+  const g = buildGraph({
+    start: '2026-07-28', days: 7, categories: CATS, tasks: [],
+    events: { '2026-08-03': [{ _dbId: 8, catId: 'c1', title: '来月' }] },
+  });
+  assert.deepStrictEqual([...g.adj.get('event:8')].sort(), ['cat:c1', 'date:2026-08-03'],
+    'August 3rd is inside a window that starts on July 28th');
 });
 
 test('a wikilink in a title is flattened for canvas text', () => {
-  const g = build({ events: { [k(3)]: [{ _dbId: 6, catId: 'c1', title: '[[バイト先|現場]] と打合せ' }] } });
-  assert.strictEqual(g.nodes.find(n => n.id === 'event:6').label, '現場 と打合せ');
+  const g = build({ events: { [IN]: [{ _dbId: 9, catId: 'c1', title: '[[バイト先|現場]] と打合せ' }] } });
+  assert.strictEqual(g.nodes.find(n => n.id === 'event:9').label, '現場 と打合せ');
 });
 
 test('an event without a _dbId still gets a unique id', () => {
-  const g = build({ events: { [k(3)]: [{ catId: 'c1', title: 'A' }, { catId: 'c1', title: 'B' }] } });
+  const g = build({ events: { [IN]: [{ catId: 'c1', title: 'A' }, { catId: 'c1', title: 'B' }] } });
   const evs = kindOf(g, 'event');
   assert.strictEqual(evs.length, 2);
   assert.strictEqual(new Set(evs.map(n => n.id)).size, 2, 'ids must not collide');
@@ -84,14 +155,14 @@ test('an event without a _dbId still gets a unique id', () => {
 
 // ── tasks ────────────────────────────────────────────────────────────────────
 
-test('an open task with a due date this month links to that day', () => {
+test('an open task due inside the window links to that day', () => {
   const g = build({ tasks: [{ id: 't1', title: '請求書', dueDate: k(20), done: false }] });
   assert.deepStrictEqual([...g.adj.get('task:t1')], ['date:2026-07-20']);
 });
 
 test('a task with no due date is left out entirely', () => {
-  // dueDate is '' when the field was left blank (app.js). It belongs to no
-  // month, and the graph is month-scoped.
+  // dueDate is '' when the field was left blank (app.js). It falls on no day at
+  // all, and the graph is scoped to days.
   const g = build({ tasks: [{ id: 't2', title: 'いつか', dueDate: '', done: false }] });
   assert.strictEqual(kindOf(g, 'task').length, 0);
 });
@@ -101,34 +172,55 @@ test('a completed task is left out, as the month grid does', () => {
   assert.strictEqual(kindOf(g, 'task').length, 0);
 });
 
-test('a task due next month is left out', () => {
-  const g = build({ tasks: [{ id: 't4', title: '来月', dueDate: '2026-08-01', done: false }] });
-  assert.strictEqual(kindOf(g, 'task').length, 0);
+test('a task due after the window is left out', () => {
+  const g = build({ tasks: [{ id: 't4', title: '再来週', dueDate: k(24), done: false }] });
+  assert.strictEqual(kindOf(g, 'task').length, 0, `${k(24)} is past the last day ${k(23)}`);
 });
 
-test('a task due on a day the month does not have is left out, not dangling', () => {
-  // e.g. the 31st while looking at a 30-day month
-  const g = buildGraph({ year: 2026, month: 8, categories: CATS, events: {},   // September = 30 days
-    tasks: [{ id: 't5', title: 'X', dueDate: '2026-09-31', done: false }] });
-  assert.strictEqual(kindOf(g, 'task').length, 0);
-  assert.ok(g.edges.every(e => e.source !== 'task:t5' && e.target !== 'task:t5'));
+test('a task due before the window is left out', () => {
+  // Overdue work is not what the user asked to see; the window starts at today.
+  const g = build({ tasks: [{ id: 't5', title: '期限切れ', dueDate: k(16), done: false }] });
+  assert.strictEqual(kindOf(g, 'task').length, 0, `${k(16)} is before the start ${START}`);
+});
+
+test('a task due on the last day of the window is kept', () => {
+  const g = build({ tasks: [{ id: 't6', title: '最終日', dueDate: k(23), done: false }] });
+  assert.deepStrictEqual([...g.adj.get('task:t6')], ['date:2026-07-23']);
+});
+
+test('a task due on a date that does not exist is left out, not dangling', () => {
+  // September has 30 days, so 2026-09-31 names no day. It must not hang off a
+  // day node that was never built.
+  const g = buildGraph({
+    start: '2026-09-28', days: 7, categories: CATS, events: {},
+    tasks: [{ id: 't7', title: 'X', dueDate: '2026-09-31', done: false }],
+  });
+  assert.strictEqual(kindOf(g, 'task').length, 0, '2026-09-31 is not a real date');
+  assert.ok(g.edges.every(e => e.source !== 'task:t7' && e.target !== 'task:t7'),
+    'no edge may point at a task that was not created');
 });
 
 test('tasks carry no category edge', () => {
-  const g = build({ tasks: [{ id: 't6', title: 'X', dueDate: k(20), done: false }] });
-  assert.strictEqual(g.nodes.find(n => n.id === 'task:t6').color, undefined,
+  const g = build({ tasks: [{ id: 't8', title: 'X', dueDate: k(20), done: false }] });
+  assert.strictEqual(g.nodes.find(n => n.id === 'task:t8').color, undefined,
     'the view colours tasks from its theme');
 });
 
 // ── categories ───────────────────────────────────────────────────────────────
 
-test('only categories used this month become nodes', () => {
-  const g = build({ events: { [k(3)]: [{ _dbId: 7, catId: 'c1', title: 'A' }] } });
+test('only categories used inside the window become nodes', () => {
+  const g = build({ events: { [IN]: [{ _dbId: 10, catId: 'c1', title: 'A' }] } });
   const cats = kindOf(g, 'cat').map(n => n.id);
   assert.deepStrictEqual(cats, ['cat:c1'], 'c9 is never referenced, s1 has no events');
 });
 
-test('a category with no events this month is left out', () => {
+test('a category whose only event is outside the window is left out', () => {
+  const g = build({ events: { [k(24)]: [{ _dbId: 11, catId: 'c1', title: '来週' }] } });
+  assert.strictEqual(kindOf(g, 'cat').length, 0,
+    'an excluded event must not drag its category in');
+});
+
+test('a category with no events at all is left out', () => {
   const g = build({});
   assert.strictEqual(kindOf(g, 'cat').length, 0);
 });
@@ -137,7 +229,7 @@ test('a category with no events this month is left out', () => {
 
 test('there are exactly three kinds of edge and no day-to-day chain', () => {
   const g = build({
-    events: { [k(3)]: [{ _dbId: 8, catId: 'c1', title: 'A' }], [k(4)]: [{ _dbId: 9, catId: 'c1', title: 'B' }] },
+    events: { [IN]: [{ _dbId: 12, catId: 'c1', title: 'A' }], [k(19)]: [{ _dbId: 13, catId: 'c1', title: 'B' }] },
   });
   const dayToDay = g.edges.filter(e => e.source.startsWith('date:') && e.target.startsWith('date:'));
   assert.deepStrictEqual(dayToDay, [], 'consecutive days must not be chained');
@@ -146,22 +238,22 @@ test('there are exactly three kinds of edge and no day-to-day chain', () => {
 test('degree counts both ends and drives the radius', () => {
   const g = build({
     events: {
-      [k(3)]: [{ _dbId: 10, catId: 'c1', title: 'A' }, { _dbId: 11, catId: 'c1', title: 'B' }],
-      [k(4)]: [{ _dbId: 12, catId: 'c1', title: 'C' }],
+      [IN]: [{ _dbId: 14, catId: 'c1', title: 'A' }, { _dbId: 15, catId: 'c1', title: 'B' }],
+      [k(19)]: [{ _dbId: 16, catId: 'c1', title: 'C' }],
     },
   });
   assert.strictEqual(g.nodes.find(n => n.id === 'cat:c1').degree, 3, 'three events point at it');
-  assert.strictEqual(g.nodes.find(n => n.id === 'date:2026-07-03').degree, 2);
-  assert.strictEqual(g.nodes.find(n => n.id === 'event:10').degree, 2, 'its day and its category');
+  assert.strictEqual(g.nodes.find(n => n.id === 'date:2026-07-18').degree, 2);
+  assert.strictEqual(g.nodes.find(n => n.id === 'event:14').degree, 2, 'its day and its category');
   const cat = g.nodes.find(n => n.id === 'cat:c1');
-  const ev = g.nodes.find(n => n.id === 'event:10');
+  const ev = g.nodes.find(n => n.id === 'event:14');
   assert.ok(cat.r > ev.r, 'the hub must be drawn larger');
 });
 
 test('every edge points at a node that exists', () => {
   const g = build({
-    events: { [k(3)]: [{ _dbId: 13, catId: 'c1', title: 'A' }, { _dbId: 14, catId: 'nope', title: 'B' }] },
-    tasks: [{ id: 't7', title: 'X', dueDate: k(3), done: false }],
+    events: { [IN]: [{ _dbId: 17, catId: 'c1', title: 'A' }, { _dbId: 18, catId: 'nope', title: 'B' }] },
+    tasks: [{ id: 't9', title: 'X', dueDate: IN, done: false }],
   });
   const have = new Set(g.nodes.map(n => n.id));
   for (const e of g.edges) {
@@ -174,6 +266,187 @@ test('nodeRadius is clamped and grows with degree', () => {
   assert.strictEqual(nodeRadius(0), 4);
   assert.ok(nodeRadius(4) > nodeRadius(1));
   assert.ok(nodeRadius(1000) <= 14, 'a huge hub must not swallow the canvas');
+});
+
+// ── today's pull ─────────────────────────────────────────────────────────────
+// A weight tells the force layer to hold a link shorter and stiffer, so today's
+// events and tasks gather around today's day node. `today` comes in as a string
+// because the model must never read the wall clock — see the test below that
+// guards the omitted case.
+
+test("an event on today is linked to its day more heavily than an event on any other day", () => {
+  const g = build({
+    today: START,
+    events: {
+      [START]: [{ _dbId: 20, catId: 'c1', title: '今日' }],
+      [IN]: [{ _dbId: 21, catId: 'c1', title: '明日' }],
+    },
+  });
+  const todayW = edge(g, 'event:20', 'date:2026-07-17').weight;
+  const otherW = edge(g, 'event:21', 'date:2026-07-18').weight;
+  assert.ok(todayW > otherW, `today's day edge must be the heavier one: today ${todayW}, other day ${otherW}`);
+  assert.strictEqual(otherW, 1, `an ordinary day must keep the default weight, got ${otherW}`);
+});
+
+test('a task due today is linked to its day more heavily than a task due another day', () => {
+  const g = build({
+    today: START,
+    tasks: [
+      { id: 't20', title: '今日締切', dueDate: START, done: false },
+      { id: 't21', title: '週末締切', dueDate: k(20), done: false },
+    ],
+  });
+  const todayW = edge(g, 'task:t20', 'date:2026-07-17').weight;
+  const otherW = edge(g, 'task:t21', 'date:2026-07-20').weight;
+  assert.ok(todayW > otherW, `today's task must be held closer: today ${todayW}, other day ${otherW}`);
+  assert.strictEqual(otherW, 1, `an ordinary due date must keep the default weight, got ${otherW}`);
+});
+
+test("an event on today keeps the default weight on its category edge", () => {
+  // Only the day edge tightens. Pulling the category in as well would drag
+  // every other day's events that share it, smearing the cluster back out.
+  const g = build({ today: START, events: { [START]: [{ _dbId: 22, catId: 'c1', title: '今日' }] } });
+  const dayW = edge(g, 'event:22', 'date:2026-07-17').weight;
+  const catW = edge(g, 'event:22', 'cat:c1').weight;
+  assert.ok(dayW > 1, `the day edge should have been weighted, got ${dayW}`);
+  assert.strictEqual(catW, 1, `the category edge must stay ordinary, got ${catW}`);
+});
+
+test('with no today given, every edge carries the same weight', () => {
+  // The guard that keeps the rest of this file clock-independent: buildGraph is
+  // given a fixed window, so a model that read new Date() would pass this week
+  // and fail the next.
+  const g = build({
+    events: { [START]: [{ _dbId: 23, catId: 'c1', title: 'A' }] },
+    tasks: [{ id: 't22', title: 'X', dueDate: START, done: false }],
+  });
+  const weights = [...new Set(g.edges.map(e => e.weight))];
+  assert.deepStrictEqual(weights, [1], `omitting today must weight nothing; saw weights [${weights.join(', ')}]`);
+});
+
+test('a today outside the window on screen weights nothing', () => {
+  // The app always starts the window at today, but the model must not assume it.
+  const g = build({
+    today: '2026-08-17',
+    events: { [START]: [{ _dbId: 24, catId: 'c1', title: 'A' }] },
+    tasks: [{ id: 't23', title: 'X', dueDate: START, done: false }],
+  });
+  const heavy = g.edges.filter(e => e.weight !== 1);
+  assert.deepStrictEqual(heavy, [], `a day outside the window must not pull: ${JSON.stringify(heavy)}`);
+});
+
+// ── today at the centre ──────────────────────────────────────────────────────
+// A pinned node is one the force layer holds at the origin, so today sits in
+// the middle of the picture and the week arranges itself around it. As with
+// the weights above, the model only names which day it is; what pinning means
+// is the physics' business.
+
+test("today's day node is pinned and no other day is", () => {
+  const g = build({ today: START });
+  const pinned = g.nodes.filter(n => n.pinned).map(n => n.id);
+  assert.deepStrictEqual(pinned, ['date:2026-07-17'], `exactly today must be pinned; pinned [${pinned.join(', ')}]`);
+});
+
+test('an event on today is not pinned — only the day it hangs off is', () => {
+  // The events gather around today because their link is weighted, not because
+  // they are held anywhere. Pinning them too would stack them all on one point.
+  const g = build({
+    today: START,
+    events: { [START]: [{ _dbId: 25, catId: 'c1', title: '今日' }] },
+    tasks: [{ id: 't24', title: '今日締切', dueDate: START, done: false }],
+  });
+  assert.ok(!g.nodes.find(n => n.id === 'event:25').pinned, "today's event must stay free to move");
+  assert.ok(!g.nodes.find(n => n.id === 'task:t24').pinned, "today's task must stay free to move");
+});
+
+test('with no today given, no day is pinned', () => {
+  // The same clock-independence guard the weights have.
+  const g = build({});
+  const pinned = g.nodes.filter(n => n.pinned).map(n => n.id);
+  assert.deepStrictEqual(pinned, [], `omitting today must pin nothing; pinned [${pinned.join(', ')}]`);
+});
+
+test('a today outside the window on screen pins nothing', () => {
+  const g = build({ today: '2026-08-17' });
+  const pinned = g.nodes.filter(n => n.pinned).map(n => n.id);
+  assert.deepStrictEqual(pinned, [], `a day outside the window must not be pinned; pinned [${pinned.join(', ')}]`);
+});
+
+// ── notes today's events mention ──────────────────────────────────────────────
+// A [[note]] written in today's event title becomes its own node, held near the
+// event with the same weight that gathers today's cluster — so the note lands
+// near the centre. Only today's events do this: the other six days would spray
+// notes across the window. The target (before any '|') is the node; an alias is
+// only display text. See buildGraph's event loop.
+
+test("a [[note]] in today's event title becomes a note node linked with weight 3", () => {
+  const g = build({ today: START, events: { [START]: [{ _dbId: 30, catId: 'c1', title: '打合せ [[案件A]]' }] } });
+  const note = g.nodes.find(n => n.id === 'note:案件A');
+  assert.ok(note, 'the note the title mentions must become a node');
+  assert.strictEqual(note.kind, 'note', `a note node must be kind "note", got ${note && note.kind}`);
+  assert.strictEqual(note.label, '案件A', `the label is the note name, got ${note && note.label}`);
+  const w = edge(g, 'event:30', 'note:案件A').weight;
+  assert.strictEqual(w, 3, `the event->note edge must carry the today weight 3, got ${w}`);
+});
+
+test("a note node carries no colour, so the view themes it like a task", () => {
+  const g = build({ today: START, events: { [START]: [{ _dbId: 31, catId: 'c1', title: '[[案件A]]' }] } });
+  const note = g.nodes.find(n => n.id === 'note:案件A');
+  assert.strictEqual(note.color, undefined, 'the model must not colour a note; the view decides');
+  assert.strictEqual(note.ref, undefined, 'a note has no source record to reference');
+});
+
+test("[[note|alias]] keys the node on the target, not the alias", () => {
+  const g = build({ today: START, events: { [START]: [{ _dbId: 32, catId: 'c1', title: '[[案件A|あの件]]' }] } });
+  assert.ok(g.nodes.find(n => n.id === 'note:案件A'), 'the node is the note (target), got ids ' + JSON.stringify(ids(g).filter(x => x.startsWith('note:'))));
+  assert.ok(!g.nodes.find(n => n.id === 'note:あの件'), 'the alias must not become a node');
+});
+
+test("two of today's events naming the same note share one node", () => {
+  const g = build({
+    today: START,
+    events: { [START]: [
+      { _dbId: 33, catId: 'c1', title: '午前 [[案件A]]' },
+      { _dbId: 34, catId: 'c1', title: '午後 [[案件A]]' },
+    ] },
+  });
+  assert.strictEqual(kindOf(g, 'note').length, 1, 'the shared note must not be duplicated');
+  assert.strictEqual(g.nodes.find(n => n.id === 'note:案件A').degree, 2, 'both events link to the one note');
+});
+
+test("a [[note]] on another day's event does not become a node", () => {
+  // Only today's events pull notes in — "本日の予定を中心に" is the whole point.
+  const g = build({
+    today: START,
+    events: {
+      [START]: [{ _dbId: 35, catId: 'c1', title: '今日 [[今日ノート]]' }],
+      [IN]: [{ _dbId: 36, catId: 'c1', title: '明日 [[明日ノート]]' }],
+    },
+  });
+  assert.ok(g.nodes.find(n => n.id === 'note:今日ノート'), "today's note must be a node");
+  assert.ok(!g.nodes.find(n => n.id === 'note:明日ノート'), "another day in the window must not add notes");
+  assert.strictEqual(kindOf(g, 'note').length, 1, 'only today contributes notes');
+});
+
+test("a today event with no wikilink creates no note node", () => {
+  const g = build({ today: START, events: { [START]: [{ _dbId: 37, catId: 'c1', title: 'ただの打合せ' }] } });
+  assert.strictEqual(kindOf(g, 'note').length, 0, 'a plain title must not spawn a note');
+});
+
+test("with no today given, no note node is created (clock-independence guard)", () => {
+  const g = build({ events: { [START]: [{ _dbId: 38, catId: 'c1', title: '[[案件A]]' }] } });
+  assert.strictEqual(kindOf(g, 'note').length, 0, 'omitting today must create no notes');
+});
+
+test("a note node is not pinned — only today's day is held at the origin", () => {
+  const g = build({ today: START, events: { [START]: [{ _dbId: 39, catId: 'c1', title: '[[案件A]]' }] } });
+  assert.ok(!g.nodes.find(n => n.id === 'note:案件A').pinned, 'the note must stay free to move');
+});
+
+test("a task due today does not pull in the [[notes]] in its title", () => {
+  // The user asked for 予定内容 (event content), not task content. Tasks stay out.
+  const g = build({ today: START, tasks: [{ id: 't30', title: '[[タスクノート]] 提出', dueDate: START, done: false }] });
+  assert.strictEqual(kindOf(g, 'note').length, 0, 'tasks must not spawn note nodes');
 });
 
 // ── hitTest ──────────────────────────────────────────────────────────────────
@@ -193,12 +466,18 @@ test('hitTest prefers the node drawn last where they overlap', () => {
 // ── tolerating junk ──────────────────────────────────────────────────────────
 
 test('buildGraph survives empty and missing inputs', () => {
-  assert.doesNotThrow(() => buildGraph({ year: Y, month: M }));
-  const g = buildGraph({ year: Y, month: M });
-  assert.strictEqual(kindOf(g, 'date').length, 31);
+  assert.doesNotThrow(() => buildGraph({ start: START }));
+  const g = buildGraph({ start: START });
+  assert.strictEqual(kindOf(g, 'date').length, 7);
+});
+
+test('buildGraph with no start at all builds nothing rather than NaN days', () => {
+  assert.doesNotThrow(() => buildGraph({}));
+  const g = buildGraph({});
+  assert.deepStrictEqual(g.nodes, [], `a missing window must produce no nodes; got [${ids(g).join(', ')}]`);
 });
 
 test('a malformed date key in events is skipped, not fatal', () => {
-  const g = build({ events: { 'garbage': [{ _dbId: 15, catId: 'c1', title: 'X' }] } });
+  const g = build({ events: { 'garbage': [{ _dbId: 40, catId: 'c1', title: 'X' }] } });
   assert.strictEqual(kindOf(g, 'event').length, 0);
 });

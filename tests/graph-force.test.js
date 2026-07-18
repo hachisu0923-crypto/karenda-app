@@ -96,6 +96,35 @@ test('linkDistance is what a linked pair converges to — change it and the dist
   assert.ok(long > 300, `expected to stretch well out, got ${long.toFixed(0)}`);
 });
 
+test('a weighted link converges closer than a plain one — the weight divides the rest length', () => {
+  // Follows from the test above: since the rest length is the lever, a weight
+  // has to shorten it to gather anything. Weight 3 means a rest length of
+  // 250/3 ≈ 83 rather than 250.
+  const at = w => {
+    const sim = F.createSim(g(['a', 'b'], [{ source: 'a', target: 'b', weight: w }]));
+    F.settle(sim);
+    return dist(sim.nodes[0], sim.nodes[1]);
+  };
+  const plain = at(1), heavy = at(3);
+  assert.ok(heavy < plain, `a weight must pull the pair in: weight 1 -> ${plain.toFixed(0)}, weight 3 -> ${heavy.toFixed(0)}`);
+  assert.ok(heavy < 160, `weight 3 should land near 250/3, got ${heavy.toFixed(0)}`);
+});
+
+test('an edge with no weight lays out exactly as it did before weights existed', () => {
+  // The reproducibility guard. 250 / 1 and x * 1 are exact in IEEE754, so an
+  // unweighted edge must tick bit-for-bit as it always has.
+  const run = edges => {
+    const s = F.createSim(g(['a', 'b', 'c'], edges));
+    F.settle(s);
+    return s.nodes.map(n => n.x.toFixed(6) + ',' + n.y.toFixed(6)).join('|');
+  };
+  assert.strictEqual(
+    run([{ source: 'a', target: 'b', weight: 1 }]),
+    run([{ source: 'a', target: 'b' }]),
+    'an explicit weight of 1 must be indistinguishable from no weight at all',
+  );
+});
+
 test('the layout stays finite — no NaN, no runaway', () => {
   const nodes = Array.from({ length: 40 }, (_, i) => 'n' + i);
   const edges = nodes.slice(1).map(id => ({ source: 'n0', target: id }));   // a hub
@@ -169,6 +198,103 @@ test('a fixed node still pushes the others around', () => {
   F.settle(sim);
   assert.ok(sim.nodes[1].x !== before.x || sim.nodes[1].y !== before.y,
     'the free node should be dragged along by the link');
+});
+
+// ── pinning (today at the centre) ────────────────────────────────────────────
+// The model pins today's day node; the physics holds a pinned node at the
+// origin. Deliberately a separate flag from `fixed`: `fixed` is dragging's, and
+// the view clears it on pointer-up, which would unpin today for good.
+
+const pin = (nodes, edges, i) => {
+  const graph = g(nodes, edges);
+  graph.nodes[i].pinned = true;
+  return graph;
+};
+
+test('initLayout seeds a pinned node at the origin', () => {
+  const sim = F.createSim(pin(['a', 'b', 'c'], [], 2));
+  assert.strictEqual(sim.nodes[2].x, 0, `a pinned node must start where it stays, got x=${sim.nodes[2].x}`);
+  assert.strictEqual(sim.nodes[2].y, 0);
+});
+
+test('pinning one node leaves every other node seeded exactly where it was', () => {
+  // The pinned node keeps its place in the phyllotaxis spiral and only
+  // overrides its own coordinates. Closing the gap instead would reshuffle
+  // every seed, so a month that merely contains today would lay out differently
+  // from one that does not.
+  const seed = i => {
+    const graph = i == null ? g(['a', 'b', 'c', 'd', 'e']) : pin(['a', 'b', 'c', 'd', 'e'], [], i);
+    return F.createSim(graph).nodes;
+  };
+  const plain = seed(null), pinned = seed(2);
+  pinned.forEach((n, i) => {
+    if (i === 2) return;                        // the pinned one is meant to differ
+    assert.strictEqual(n.x, plain[i].x, `${n.id} seeded at x=${n.x}, was ${plain[i].x}`);
+    assert.strictEqual(n.y, plain[i].y, `${n.id} seeded at y=${n.y}, was ${plain[i].y}`);
+  });
+});
+
+test('a node seeded on top of the pin is nudged aside, not fired out of the viewport', () => {
+  // Not hypothetical: the spiral seeds index 0 at the origin (r = 10 * sqrt(0)),
+  // which is exactly where the pin goes, so every month containing today stacks
+  // two nodes on the same point. Repulsion is inverse-square, so how far apart a
+  // stacked pair is *pretended* to be decides everything. At the 1e-3 this used
+  // to nudge by, one tick threw the stacked node 1,171,879px out and took the
+  // month's bounding box with it.
+  const sim = F.createSim(pin(['a', 'b', 'c'], [], 2));   // 'a' seeds at the origin too
+  assert.strictEqual(sim.nodes[0].x, sim.nodes[2].x, 'this test is pointless unless they really are stacked');
+  F.tick(sim);
+  const d = Math.hypot(sim.nodes[0].x, sim.nodes[0].y);
+  assert.ok(d > 0, 'the stacked node must come off the pin');
+  assert.ok(d < 100, `one tick moved it ${d.toFixed(0)}px: a divide-by-zero must not be answered with an explosion`);
+  F.settle(sim);
+  sim.nodes.forEach(n => assert.ok(Math.abs(n.x) < 1000 && Math.abs(n.y) < 1000,
+    `${n.id} settled at (${n.x.toFixed(0)}, ${n.y.toFixed(0)}) — a month is a few hundred px across`));
+});
+
+test('a pinned node is still exactly at the origin once the layout has settled', () => {
+  const sim = F.createSim(pin(['a', 'b', 'c'], [{ source: 'a', target: 'b' }, { source: 'a', target: 'c' }], 0));
+  F.settle(sim);
+  assert.strictEqual(sim.nodes[0].x, 0, `today must not drift; ended at x=${sim.nodes[0].x}`);
+  assert.strictEqual(sim.nodes[0].y, 0);
+});
+
+test('a pinned node still pushes the others around', () => {
+  // Same as a fixed node: it contributes forces, it just does not integrate its
+  // own. If it did not, the month would settle as though today were not there.
+  const sim = F.createSim(pin(['a', 'b'], [{ source: 'a', target: 'b' }], 0));
+  const before = { x: sim.nodes[1].x, y: sim.nodes[1].y };
+  F.settle(sim);
+  assert.ok(sim.nodes[1].x !== before.x || sim.nodes[1].y !== before.y,
+    'the free node should be moved by the pinned one');
+  const d = dist(sim.nodes[0], sim.nodes[1]);
+  assert.ok(d > 60 && d < 400, `the spring must still act on the free end: settled ${d.toFixed(0)}px out`);
+});
+
+test('a drag cannot move a pinned node — pinned beats fixed', () => {
+  // What the view does to a node under the pointer: set fixed, then write the
+  // pointer's position into x/y every move. Today ignores both.
+  const sim = F.createSim(pin(['a', 'b'], [{ source: 'a', target: 'b' }], 0));
+  const a = sim.nodes[0];
+  a.fixed = true;
+  a.x = 300; a.y = 300;
+  F.tick(sim);
+  assert.strictEqual(a.x, 0, `a pinned node must snap back, got x=${a.x}`);
+  assert.strictEqual(a.y, 0, `a pinned node must snap back, got y=${a.y}`);
+});
+
+test('a node with pinned: false lays out exactly as one with no pinned field at all', () => {
+  // The reproducibility guard, the twin of the weight one above: a graph with
+  // nothing pinned — every month that is not this one — must tick bit-for-bit
+  // as it always has.
+  const run = mark => {
+    const graph = g(['a', 'b', 'c'], [{ source: 'a', target: 'b' }]);
+    if (mark) graph.nodes[0].pinned = false;
+    const s = F.createSim(graph);
+    F.settle(s);
+    return s.nodes.map(n => n.x.toFixed(6) + ',' + n.y.toFixed(6)).join('|');
+  };
+  assert.strictEqual(run(true), run(false), 'an explicit pinned: false must be indistinguishable from no flag at all');
 });
 
 // ── camera ───────────────────────────────────────────────────────────────────

@@ -29,9 +29,21 @@
   var ALPHA_DECAY = 0.0228;   // d3's rate: 1 -> 0.001 in ~300 ticks
   var VELOCITY_DECAY = 0.6;
 
+  // How far apart two nodes at exactly the same point are treated as being (px).
+  // It has to be a real distance, not a hair's width: repulsion is inverse
+  // square, so pretending a stacked pair is 1e-3px apart answers the division by
+  // zero with an impulse of ~1e6. 10 is what initLayout seeds neighbours with,
+  // so a stacked pair drifts apart at the rate the spiral would have held them.
+  var COINCIDENT_GAP = 10;
+  var COINCIDENT_LEG = COINCIDENT_GAP * Math.SQRT1_2;   // its legs, on the diagonal
+
   // Phyllotaxis, the sunflower spiral d3 uses for initial placement.
   // Deterministic on purpose: no seeded RNG to carry around, and the same
   // input lays out the same way every run, which is what makes it testable.
+  //
+  // A pinned node starts where it will stay. It keeps its spiral index so every
+  // other node seeds exactly where it always has — moving the rest up a slot
+  // would change the whole layout of a month that merely contains today.
   function initLayout(nodes) {
     var PHI = Math.PI * (3 - Math.sqrt(5));
     nodes.forEach(function (n, i) {
@@ -41,6 +53,7 @@
       n.y = r * Math.sin(a);
       n.vx = 0;
       n.vy = 0;
+      if (n.pinned) { n.x = 0; n.y = 0; }
     });
     return nodes;
   }
@@ -53,8 +66,11 @@
     var index = new Map();
     nodes.forEach(function (n, i) { index.set(n.id, i); });
     // Resolve ids once so tick() never does a map lookup per edge per frame.
+    // The weight rides along: an edge without one is a plain link (w = 1).
     var links = graph.edges
-      .map(function (e) { return { s: index.get(e.source), t: index.get(e.target) }; })
+      .map(function (e) {
+        return { s: index.get(e.source), t: index.get(e.target), w: (e.weight == null ? 1 : e.weight) };
+      })
       .filter(function (l) { return l.s != null && l.t != null; });
     return { nodes: nodes, links: links, alpha: ALPHA_START, opts: o };
   }
@@ -74,9 +90,17 @@
         dx = b.x - a.x;
         dy = b.y - a.y;
         d2 = dx * dx + dy * dy;
-        // Coincident nodes would divide by zero; nudge them apart
-        // deterministically (by index, not at random) so they separate.
-        if (d2 < 1e-6) { dx = (i - j) * 1e-3; dy = (j - i) * 1e-3; d2 = dx * dx + dy * dy; }
+        // Coincident nodes would divide by zero; nudge them apart along a fixed
+        // diagonal (deterministic, not at random) so they separate. j > i
+        // always, so this is the direction the old (i - j) form always took —
+        // only the size changed, and only for a pair stacked within 1e-3px,
+        // which the spiral never seeds. Any other pair ticks exactly as before.
+        //
+        // The size mattered the moment today got pinned: the pin lands on the
+        // origin, where the spiral seeds its first node too, and the old 1e-3
+        // nudge threw that node 1,171,879px out in one tick — the whole month's
+        // bounding box went with it.
+        if (d2 < 1e-6) { dx = -COINCIDENT_LEG; dy = COINCIDENT_LEG; d2 = COINCIDENT_GAP * COINCIDENT_GAP; }
         d = Math.sqrt(d2);
         f = (o.repelStrength * 100 * alpha) / d2;
         var rx = (dx / d) * f, ry = (dy / d) * f;
@@ -85,14 +109,29 @@
       }
     }
 
-    // Links — a spring pulling toward linkDistance.
+    // Links — a spring pulling toward its rest length.
+    //
+    // A weighted link is "shorter and stiffer", which is one idea from two
+    // numbers. The rest length is the half that actually gathers nodes: at
+    // these forces repulsion never pushes a pair past linkDistance, so a
+    // stiffer spring alone would only hold the pair at the same 250 more
+    // firmly (see graph-force.test.js, 'linkDistance is what a linked pair
+    // converges to'). Dividing the rest length is what brings them in; the
+    // matching stiffness is what keeps ~190 nodes of repulsion from prying
+    // the cluster back open.
+    //
+    // w = 1 leaves this arithmetically identical to the unweighted version:
+    // x / 1 and x * 1 are exact in IEEE754, so plain links tick bit-for-bit
+    // as before and the reproducibility tests still hold.
     for (i = 0; i < links.length; i++) {
       a = nodes[links[i].s];
       b = nodes[links[i].t];
+      var w = links[i].w;
       dx = b.x - a.x;
       dy = b.y - a.y;
       d = Math.sqrt(dx * dx + dy * dy) || 1e-6;
-      f = ((d - o.linkDistance) / d) * alpha * o.linkStrength * 0.1;
+      var rest = o.linkDistance / w;
+      f = ((d - rest) / d) * alpha * o.linkStrength * w * 0.1;
       var lx = dx * f, ly = dy * f;
       a.vx += lx; a.vy += ly;
       b.vx -= lx; b.vy -= ly;
@@ -105,10 +144,16 @@
       a.vy -= a.y * o.centerStrength * alpha * 0.1;
     }
 
-    // Integrate. A node being dragged is pinned: it takes the pointer's
-    // position and contributes forces, but never moves on its own.
+    // Integrate. Two kinds of node sit still, and both still push and pull on
+    // the others — they just do not integrate their own velocity.
+    //
+    //   pinned — held at the origin by the model (today). Checked first, so it
+    //            wins over a drag: the pointer may set x/y, and the next tick
+    //            puts it back. Today is not draggable, by design.
+    //   fixed  — being dragged right now; it takes the pointer's position.
     for (i = 0; i < n; i++) {
       a = nodes[i];
+      if (a.pinned) { a.x = 0; a.y = 0; a.vx = 0; a.vy = 0; continue; }
       if (a.fixed) { a.vx = 0; a.vy = 0; continue; }
       a.vx *= VELOCITY_DECAY;
       a.vy *= VELOCITY_DECAY;

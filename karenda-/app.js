@@ -126,7 +126,7 @@ let currentView    = 'month';  // 'month' | 'week' | 'day' | 'budget' | 'goal' |
 // ReferenceError で app.js 全体が止まる（VIEW_ELS 以降が全部消える）。
 let _graphSim = null;      // 現在のシミュレーション
 let _graphData = null;     // 現在の { nodes, edges, adj }
-let _graphMonth = null;    // 組み立て済みの月（'YYYY-MM'）
+let _graphWindow = null;   // 組み立て済みの窓の起点（'YYYY-MM-DD'。常に今日）
 let _graphCam = { zoom: 1, tx: 0, ty: 0 };
 let _graphRaf = null;      // 動いているフレームループ / 予約された単発フレーム
 let _graphHover = null;    // ホバー中のノード id（隣接以外を減光する）
@@ -6304,8 +6304,11 @@ function renderGraphView() {
   const view = document.getElementById('js-graph-view');
   if (!view) return;
 
-  const mk = formatYM(curDate);
-  const monthChanged = _graphMonth !== mk || !_graphData;
+  // グラフは月ではなく「今日から7日間」を描く（ユーザー要望「その日から7日以内の
+  // 予定だけを表示して」）。起点は今日に固定なので、月を送ってもグラフは変わらない
+  // ——意図した挙動で、curDate には依存しない。
+  const start = _todayStrLocal();
+  const windowChanged = _graphWindow !== start || !_graphData;
 
   // 作り直す前に今の座標を控える。データが変わるたびに buildGraph が新しい
   // ノードを作り、createSim の initLayout が x/y を上書きするので、そのままだと
@@ -6313,18 +6316,21 @@ function renderGraphView() {
   const prev = new Map((_graphSim ? _graphSim.nodes : []).map(n => [n.id, n]));
 
   _graphData = graphModel.buildGraph({
-    year: curDate.getFullYear(),
-    month: curDate.getMonth(),
+    start: start,
+    days: 7,
     events: events,
     categories: categories,
     tasks: (typeof _taskState !== 'undefined' && _taskState) ? _taskState.tasks : [],
+    // 今日の予定・タスクを今日の日付ノードに引き寄せる。モデルは壁時計を読まない
+    // ので（読むとテストが時計依存になる）、呼ぶ側が今日を渡す。
+    today: start,
   });
-  _graphMonth = mk;
+  _graphWindow = start;
   _graphSim = graphForce.createSim(_graphData);
   _graphHover = null;                 // 古い id は消えているかもしれない
   _graphDrag = null;
 
-  if (!monthChanged) {
+  if (!windowChanged) {
     // 見覚えのある点は元の場所に戻す。新顔だけが phyllotaxis の初期位置から
     // 動き出し、リヒートで周りが少しずれて馴染む。
     for (const n of _graphSim.nodes) {
@@ -6334,14 +6340,15 @@ function renderGraphView() {
   }
 
   const s = _graphResize();
-  if (monthChanged) {
-    // 新しい月は落ち着いた状態から見せたい（ノードが飛び回るのを見せない）。
-    // 190ノードでも実測 16ms なので、同期で収束させてから1枚描く。
+  if (windowChanged) {
+    // 新しい窓（＝日付が変わった／初回）は落ち着いた状態から見せたい（ノードが
+    // 飛び回るのを見せない）。190ノードでも実測 16ms なので、同期で収束させて
+    // から1枚描く。
     graphForce.settle(_graphSim);
     if (s) _graphCam = graphForce.fitToView(_graphData.nodes, s.w, s.h);
     _graphDraw();
   } else {
-    // 同じ月の中の変更（予定を編集した等）は、その場から動かして馴染ませる。
+    // 同じ窓の中の変更（予定を編集した等）は、その場から動かして馴染ませる。
     _graphReheat(0.3);
     _graphDraw();
   }

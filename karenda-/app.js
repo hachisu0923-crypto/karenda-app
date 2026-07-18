@@ -6119,6 +6119,7 @@ function graphTheme() {
     node:    t('--graph-node'),
     focused: t('--graph-node-focused'),
     attach:  t('--graph-node-attachment'),
+    today:   t('--graph-node-today'),
     text:    t('--graph-text'),
     faint:   t('--text-faint'),
   };
@@ -6129,6 +6130,9 @@ function graphTheme() {
 // catId が壊れた予定）はここでテーマから決める。
 function graphNodeColor(n, th) {
   if (n.color) return n.color;
+  // pinned は「今日の日付ノード」を意味する（モデルが today にだけ立てる）。
+  // 日付ノードは color を持たないので上の分岐とは衝突しないが、順序で意図を示す。
+  if (n.pinned) return th.today;
   if (n.kind === 'task') return th.attach;
   return th.node;
 }
@@ -6345,7 +6349,16 @@ function renderGraphView() {
     // 飛び回るのを見せない）。190ノードでも実測 16ms なので、同期で収束させて
     // から1枚描く。
     graphForce.settle(_graphSim);
-    if (s) _graphCam = graphForce.fitToView(_graphData.nodes, s.w, s.h);
+    if (s) {
+      // 今日（pinned）を画面のちょうど中央に置く。力学は今日を原点に held する
+      // が、周りの塊が非対称だと外接矩形の中心は原点からずれるので、中心を明示
+      // して渡す。今日が無い窓（あり得ないが）は従来どおり全体を中央に。
+      const today = _graphData.nodes.find(n => n.pinned);
+      _graphCam = graphForce.fitToView(
+        _graphData.nodes, s.w, s.h, undefined,
+        today ? { x: today.x, y: today.y } : undefined
+      );
+    }
     _graphDraw();
   } else {
     // 同じ窓の中の変更（予定を編集した等）は、その場から動かして馴染ませる。

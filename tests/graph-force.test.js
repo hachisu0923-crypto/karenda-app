@@ -345,6 +345,58 @@ test('fitToView tolerates a single node', () => {
   assert.ok(Number.isFinite(cam.zoom) && cam.zoom > 0, 'a zero-size bounding box must not divide by zero');
 });
 
+// ── fitToView with an explicit centre (today dead centre) ────────────────────
+
+test('fitToView puts an explicit centre at the exact centre of the viewport', () => {
+  // A deliberately lopsided graph: the bounding box centre is nowhere near the
+  // origin, so framing by bounding box alone would leave the origin off-centre.
+  const nodes = [{ x: 0, y: 0 }, { x: 400, y: 300 }, { x: 50, y: 20 }];
+  const cam = F.fitToView(nodes, 1200, 800, 40, { x: 0, y: 0 });
+  const c = F.worldToScreen(cam, 0, 0);
+  assert.ok(Math.abs(c.x - 600) < 1e-6, `the chosen centre landed at x=${c.x}, expected 600`);
+  assert.ok(Math.abs(c.y - 400) < 1e-6, `the chosen centre landed at y=${c.y}, expected 400`);
+});
+
+test('fitToView keeps every node on screen when it is centred on a point', () => {
+  // The offset from bounding-box framing eats into the far side, so the zoom
+  // must shrink to compensate; if it does not, the far node leaves the canvas.
+  const nodes = [{ x: 0, y: 0 }, { x: 500, y: 400 }, { x: -60, y: -30 }, { x: 120, y: -350 }];
+  const cam = F.fitToView(nodes, 1200, 800, 40, { x: 0, y: 0 });
+  nodes.forEach(n => {
+    const s = F.worldToScreen(cam, n.x, n.y);
+    assert.ok(s.x >= 0 && s.x <= 1200, `node (${n.x}, ${n.y}) sits at screen x=${s.x}, outside 0..1200`);
+    assert.ok(s.y >= 0 && s.y <= 800, `node (${n.x}, ${n.y}) sits at screen y=${s.y}, outside 0..800`);
+  });
+});
+
+test('fitToView without a centre frames exactly as it always did', () => {
+  // The guard on the original behaviour: the new argument must be inert when
+  // it is not supplied.
+  const nodes = [{ x: -100, y: -50 }, { x: 100, y: 50 }, { x: 30, y: 10 }];
+  const before = F.fitToView(nodes, 400, 300);
+  // (400 - 40*2) / 200 = 1.6, the narrower of the two axes.
+  assert.strictEqual(before.zoom, 1.6, `zoom drifted to ${before.zoom}`);
+  assert.strictEqual(before.tx, 200, `tx drifted to ${before.tx}`);
+  assert.strictEqual(before.ty, 150, `ty drifted to ${before.ty}`);
+  assert.deepStrictEqual(F.fitToView(nodes, 400, 300, undefined, undefined), before);
+});
+
+test('fitToView tolerates an empty graph even when a centre is given', () => {
+  const cam = F.fitToView([], 400, 300, 40, { x: 0, y: 0 });
+  assert.strictEqual(cam.tx, 200);
+  assert.strictEqual(cam.ty, 150);
+  assert.ok(Number.isFinite(cam.zoom), `zoom must stay finite, got ${cam.zoom}`);
+});
+
+test('fitToView tolerates a single node sitting on the centre', () => {
+  // Both half-extents are 0 here — the case that would divide by zero.
+  const cam = F.fitToView([{ x: 7, y: 7 }], 400, 300, 40, { x: 7, y: 7 });
+  assert.ok(Number.isFinite(cam.zoom) && cam.zoom > 0, `a zero half-extent must not produce ${cam.zoom}`);
+  const c = F.worldToScreen(cam, 7, 7);
+  assert.ok(Number.isFinite(c.x) && Number.isFinite(c.y), `the camera produced a non-finite position (${c.x}, ${c.y})`);
+  assert.ok(Math.abs(c.x - 200) < 1e-6, `the lone node landed at x=${c.x}, expected 200`);
+});
+
 // ── the size this actually runs at ───────────────────────────────────────────
 
 test('a realistic month (190 nodes) converges without blowing up', () => {

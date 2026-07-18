@@ -329,6 +329,7 @@ body {
   --graph-node:            var(--text-muted);
   --graph-node-focused:    var(--text-accent);
   --graph-node-attachment: var(--color-yellow);
+  --graph-node-today:      var(--color-accent);
 
   /* — Links / tags (Obsidian の実トークン) — */
   --link-color:      var(--text-accent);

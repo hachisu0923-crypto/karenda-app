@@ -193,7 +193,17 @@
     return { zoom: z, tx: sx - (sx - cam.tx) * k, ty: sy - (sy - cam.ty) * k };
   }
   // Fit the laid-out graph into w x h.
-  function fitToView(nodes, w, h, pad) {
+  //
+  // `center` (optional) is a world point to put at the exact centre of the
+  // screen — the view passes today's node, so today sits dead centre instead of
+  // wherever the bounding box happens to put it. Omit it and the framing is the
+  // original one: the bounding box's centre goes to the screen's centre.
+  //
+  // The zoom has to be derived differently in the two cases. Fitting a bounding
+  // box only needs its width; holding a chosen point at the centre means the
+  // half-screen on each side must cover the *furthest* node from that point, or
+  // the offset pushes the far edge off-screen.
+  function fitToView(nodes, w, h, pad, center) {
     var p = pad == null ? 40 : pad;
     if (!nodes.length) return { zoom: 1, tx: w / 2, ty: h / 2 };
     var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
@@ -203,12 +213,30 @@
       if (n.y < minY) minY = n.y;
       if (n.y > maxY) maxY = n.y;
     });
-    var gw = Math.max(1, maxX - minX), gh = Math.max(1, maxY - minY);
-    var zoom = clampZoom(Math.min((w - p * 2) / gw, (h - p * 2) / gh));
+    var cx, cy, zoom;
+    if (center) {
+      cx = center.x;
+      cy = center.y;
+      // Furthest node from the centre, per axis. Always >= 0, so no sign flip;
+      // 0 only when every node shares the centre's coordinate on that axis.
+      var halfW = Math.max(cx - minX, maxX - cx);
+      var halfH = Math.max(cy - minY, maxY - cy);
+      // A zero half-extent constrains nothing — Infinity drops out of the min,
+      // and clampZoom caps the all-zero case instead of returning NaN.
+      zoom = clampZoom(Math.min(
+        halfW > 0 ? (w / 2 - p) / halfW : Infinity,
+        halfH > 0 ? (h / 2 - p) / halfH : Infinity
+      ));
+    } else {
+      cx = (minX + maxX) / 2;
+      cy = (minY + maxY) / 2;
+      var gw = Math.max(1, maxX - minX), gh = Math.max(1, maxY - minY);
+      zoom = clampZoom(Math.min((w - p * 2) / gw, (h - p * 2) / gh));
+    }
     return {
       zoom: zoom,
-      tx: w / 2 - ((minX + maxX) / 2) * zoom,
-      ty: h / 2 - ((minY + maxY) / 2) * zoom,
+      tx: w / 2 - cx * zoom,
+      ty: h / 2 - cy * zoom,
     };
   }
 

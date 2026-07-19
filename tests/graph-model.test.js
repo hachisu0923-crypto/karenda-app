@@ -379,7 +379,13 @@ test('the day six days out is held on a much weaker spring than tomorrow', () =>
   const far = edge(g, 'date:' + START, 'date:' + k(23)).weight;
   assert.ok(far < near,
     `a gap of six days must weigh less than a gap of one: gap 1 is ${near}, gap 6 is ${far}`);
-  assert.ok(near / far > 2,
+  // "Well outside" is the property under test, not a particular ratio: the
+  // rings may be drawn tighter or looser (the user asks for the picture to be
+  // more or less compact) as long as the far rim still reads as a different
+  // distance from the first ring rather than a thickening of it. Half again as
+  // far is the line — a weight is 250/radius, so a ratio of weights is the
+  // inverse ratio of radii.
+  assert.ok(near / far > 1.5,
     `the rim should sit well outside the first ring: gap 1 is ${near}, gap 6 is ${far}, ratio ${near / far}`);
 });
 

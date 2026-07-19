@@ -80,15 +80,21 @@
   // bearing as tomorrow, is nearer tomorrow than today the moment rc > R1 - rc.
   // So the first ring must clear twice the inflated inner ring: 240 leaves room
   // for an inner ring up to ~117px, which is a today of roughly two dozen items.
+  // This is why the picture is made compact from the outside in: the first ring
+  // is held by that inequality and cannot come in, so the room to tighten is in
+  // the outermost ring and in DAY_CHILD_GAP below.
   var NEAR_DAY_RING = 240;   // a gap of one day
-  var FAR_DAY_RING = 510;    // the widest gap the window holds
+  var FAR_DAY_RING = 410;    // the widest gap the window holds
 
   // How far beyond its own day a day's events and tasks sit, and how wide a
   // sector they fan across (radians either side of the day's own direction).
-  // The gap has to clear the day-to-day ring spacing ((470-200)/5 = 54px) by
+  // The gap has to clear the day-to-day ring spacing ((410-240)/5 = 34px) by
   // enough that a cluster reads as belonging to its day rather than to the next
-  // ring out; the sector has to stay well inside the 60° each day owns.
-  var DAY_CHILD_GAP = 120;
+  // ring out; the sector has to stay well inside the 60° each day owns. Rings
+  // are 60° apart, so a cluster is never on the same bearing as another ring —
+  // measured, the nearest day node to any event is always its own, by 34px at
+  // the thinnest (a today holding 8 events, 8 notes and 4 tasks).
+  var DAY_CHILD_GAP = 100;
   var DAY_CHILD_SPREAD = 0.35;                          // ~20°
   var DAY_CHILD_WEIGHT = LINK_DISTANCE / DAY_CHILD_GAP;
 

@@ -107,6 +107,7 @@ const DEFAULT_CATEGORIES = [
 
 let categories     = [];
 let events         = {};          // { dateKey: [ eventObj, … ] }
+let projects       = [];   // [{id, _dbId, name, color, archived, createdAt}] 作業テーマ
 let overtimeCashouts = [];        // [{ id, catId, minutes, note, dateKey, createdAt }]
 let dailyDrinks      = {};        // { dateKey: count }
 let curDate        = new Date();
@@ -1238,7 +1239,7 @@ document.getElementById('js-auth-google').addEventListener('click', async () => 
 document.getElementById('js-logout').addEventListener('click', async () => {
   if(!ensureDb()) return;
   await db.auth.signOut();
-  currentUser = null; categories = []; events = {}; overtimeCashouts = []; dailyDrinks = {}; rebuildCatMap();
+  currentUser = null; categories = []; projects = []; events = {}; overtimeCashouts = []; dailyDrinks = {}; rebuildCatMap();
   showAuthScreen();
 });
 
@@ -4417,6 +4418,70 @@ async function deleteTaskFromSupabase(taskId) {
   } catch (e) { console.error('Task delete error:', e); setSyncStatus('error'); }
 }
 
+// ── projects（作業テーマ）──────────────────────────────────────────────────
+// タスクを束ねる軸。名前はそのまま Obsidian のノート名として使う。
+// 失敗時に null を返すのは loadTasksFromSupabase と同じ約束（空配列と区別する）。
+
+async function loadProjectsFromSupabase(userId) {
+  setSyncStatus('syncing');
+  try {
+    const { data, error } = await db
+      .from('projects')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    setSyncStatus('synced');
+    return (data || []).map(r => ({
+      id: r.project_id, _dbId: r.id,
+      name: r.name, color: r.color || '#7c6cf5',
+      archived: !!r.archived,
+      createdAt: new Date(r.created_at).getTime(),
+    }));
+  } catch (e) {
+    // テーブル未作成（42P01）でもアプリ全体は動き続けてほしい。
+    console.error('Project load error:', e);
+    setSyncStatus('error');
+    return null;
+  }
+}
+
+async function addProjectToSupabase(project) {
+  if (!currentUser) return;
+  setSyncStatus('syncing');
+  try {
+    const { data, error } = await db.from('projects').insert({
+      user_id: currentUser.id, project_id: project.id,
+      name: project.name, color: project.color, archived: !!project.archived,
+    }).select().single();
+    if (error) throw error;
+    project._dbId = data.id;
+    setSyncStatus('synced');
+  } catch (e) { console.error('Project add error:', e); setSyncStatus('error'); }
+}
+
+async function updateProjectInSupabase(project) {
+  if (!currentUser || !project._dbId) return;
+  setSyncStatus('syncing');
+  try {
+    const { error } = await db.from('projects').update({
+      name: project.name, color: project.color, archived: !!project.archived,
+    }).eq('id', project._dbId);
+    if (error) throw error;
+    setSyncStatus('synced');
+  } catch (e) { console.error('Project update error:', e); setSyncStatus('error'); }
+}
+
+// アーカイブ済みは選択肢に出さない。削除は用意しない（設計どおり）。
+function activeProjects() {
+  return projects.filter(p => !p.archived);
+}
+
+function projectById(id) {
+  if (!id) return null;
+  return projects.find(p => p.id === id) || null;
+}
+
 async function initTaskPanel(user) {
   const listEl     = document.getElementById('js-task-list');
   const formEl     = document.getElementById('js-task-add-form');
@@ -4428,6 +4493,12 @@ async function initTaskPanel(user) {
   if (!listEl || !formEl || !inputEl) return;
 
   const userId = user?.id || 'anon';
+  // プロジェクトはタスクより先に用意する（描画時に名前を引くため）。
+  if (userId !== 'anon') {
+    projects = await loadProjectsFromSupabase(userId) ?? [];
+  } else {
+    projects = [];
+  }
   let tasks;
   if (userId !== 'anon') {
     tasks = await loadTasksFromSupabase(userId) ?? loadTasks(userId);

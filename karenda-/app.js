@@ -4833,9 +4833,13 @@ function renderTaskPanel() {
   const filtered = sorted.filter(t => {
     if (filter === 'active' && t.done)  return false;
     if (filter === 'done'   && !t.done) return false;
-    if (projectFilter === 'none' && t.projectId) return false;
+    // projectId が指すプロジェクトが存在しない（削除失敗などで参照が切れた）場合は
+    // 未分類として扱う。アーカイブ済みプロジェクトは projectById で解決できるため
+    // 通常どおりそのプロジェクトの絞り込みに残る。
+    const resolvedProjectId = (t.projectId && projectById(t.projectId)) ? t.projectId : '';
+    if (projectFilter === 'none' && resolvedProjectId) return false;
     if (projectFilter && projectFilter !== 'all' && projectFilter !== 'none'
-        && t.projectId !== projectFilter) return false;
+        && resolvedProjectId !== projectFilter) return false;
     return true;
   });
 

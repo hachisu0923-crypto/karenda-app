@@ -774,3 +774,87 @@ test('the same input anchors the same way every build', () => {
   }).nodes.map(n => n.id + ':' + (n.anchor ? n.anchor.x.toFixed(6) + ',' + n.anchor.y.toFixed(6) : '-')).join('|');
   assert.strictEqual(shape(), shape(), 'the layout policy must be deterministic');
 });
+
+// ── how much play each anchor allows ─────────────────────────────────────────
+// "予定は現状の距離感を保ち、ある程度範囲で自由に動いて" — an anchor is a dead
+// zone rather than a point, and the model decides its radius. The force layer
+// only reads `anchorSlack` (graph-force.js); the policy of who gets play, and
+// how much, is here.
+
+const slackFixture = () => build({
+  today: START,
+  events: {
+    [START]: [{ _dbId: 200, catId: 'c1', title: '今日 [[メモ]]' }],
+    [IN]: [{ _dbId: 201, catId: 'c1', title: '明日' }],
+  },
+  tasks: [
+    { id: 't200', title: '今日の課題', dueDate: START, done: false },
+    { id: 't201', title: '明日の課題', dueDate: IN, done: false },
+  ],
+});
+
+test("every day's events, tasks and notes are given play, today's included", () => {
+  const g = slackFixture();
+  ['event:200', 'event:201', 'task:t200', 'task:t201', 'note:メモ'].forEach(id => {
+    const n = node(g, id);
+    assert.ok(n.anchorSlack > 0, `${id} must be free to move within its zone, got ${n.anchorSlack}`);
+  });
+});
+
+test('a day node is held hard, with no play at all', () => {
+  // The days are the frame the picture is read against: distance from the
+  // centre means how far away in time, and direction means which day. A day
+  // that wandered would move the ring its own events are measured from, so the
+  // play stops at the frame.
+  const g = slackFixture();
+  const days = kindOf(g, 'date').filter(n => n.key !== START);
+  assert.ok(days.length, 'sanity: the window must hold days other than today');
+  days.forEach(n => {
+    assert.ok(n.anchor, `${n.id} must still be anchored`);
+    assert.strictEqual(n.anchorSlack, undefined, `${n.id} must be held exactly at its ring`);
+  });
+});
+
+test('today and a category get no play, because neither is anchored', () => {
+  // Today is pinned, which outranks an anchor; a category belongs to whichever
+  // days use it. Slack without an anchor would be meaningless, so neither
+  // carries one.
+  const g = slackFixture();
+  [node(g, 'date:' + START), node(g, 'cat:c1')].forEach(n => {
+    assert.strictEqual(n.anchor, undefined, `${n.id} must stay unanchored`);
+    assert.strictEqual(n.anchorSlack, undefined, `${n.id} must not carry slack either`);
+  });
+});
+
+test('the play is small next to the gap it sits in, so clusters cannot merge', () => {
+  // The bound that keeps the arrangement legible: an event is anchored
+  // DAY_CHILD_GAP beyond its own day, so a zone wider than a quarter of that
+  // would let a cluster drift back inside its day's ring or out toward the next
+  // one. Read off the built graph rather than the constants, so the assertion
+  // survives either being retuned.
+  const g = slackFixture();
+  const ev = node(g, 'event:201');
+  const day = node(g, 'date:' + IN);
+  const gap = Math.hypot(ev.anchor.x, ev.anchor.y) - Math.hypot(day.anchor.x, day.anchor.y);
+  assert.ok(ev.anchorSlack < gap / 3,
+    `play ${ev.anchorSlack} must stay well inside the ${gap.toFixed(1)}px it is anchored beyond its day`);
+});
+
+test('every node given play is given an anchor to have play around', () => {
+  const g = build({
+    today: START,
+    events: { [k(19)]: [{ _dbId: 210, catId: 'c1', title: 'A' }, { _dbId: 211, catId: 's1', title: '' }] },
+    tasks: [{ id: 't210', title: 'X', dueDate: k(20), done: false }],
+  });
+  g.nodes.filter(n => n.anchorSlack !== undefined).forEach(n => {
+    assert.ok(n.anchor, `${n.id} carries slack but no anchor for it to be slack around`);
+    assert.ok(Number.isFinite(n.anchorSlack) && n.anchorSlack > 0,
+      `${n.id} has a nonsense slack: ${n.anchorSlack}`);
+  });
+});
+
+test('the same input gives the same play every build', () => {
+  const shape = () => slackFixture().nodes
+    .map(n => n.id + ':' + (n.anchorSlack === undefined ? '-' : n.anchorSlack)).join('|');
+  assert.strictEqual(shape(), shape(), 'the play policy must be deterministic like the rest');
+});

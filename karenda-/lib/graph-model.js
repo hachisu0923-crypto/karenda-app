@@ -114,6 +114,42 @@
   var DAY_CHILD_SPREAD = 0.35;                          // ~20°
   var DAY_CHILD_WEIGHT = LINK_DISTANCE / DAY_CHILD_GAP;
 
+  // How far an event, task or note may drift from its anchor before anything
+  // pulls it back ("予定は現状の距離感を保ち、ある程度範囲で自由に動いて").
+  // Inside this radius the force layer applies no anchor force at all, so the
+  // node is placed by repulsion and its springs alone; the anchor only catches
+  // it at the rim. The point is to keep the arrangement — which ring, which
+  // day's direction — while losing the drilled-rank look of every cluster
+  // sitting on an exact computed point.
+  //
+  // Only the day children get it. Day nodes keep their anchors hard: they are
+  // the frame the picture is read against, and a wandering day would move the
+  // ring its own events are measured from. Today is pinned and has no anchor.
+  //
+  // The size is bounded by the condition it is most likely to break: every
+  // event must still be nearest to its own day node. A node free to move
+  // `slack` in any direction can gain up to `slack` of distance to its own day
+  // while losing up to `slack` to a rival, so in the worst direction it could
+  // spend 2 * slack of that margin. Measured before this change, the thinnest
+  // margin across the fixtures was 35.2px (a today holding 8 events, 8 notes
+  // and 4 tasks), which caps slack at ~17px if the worst direction actually
+  // happened. It does not — repulsion pushes a crowded node outward, away from
+  // the rival day rather than at it — so the measured cost at 16 is about 11px,
+  // not 32: the thinnest margin lands at 26.2px, still comfortably positive
+  // across all four fixtures.
+  //
+  // 16 is also under a quarter of DAY_CHILD_GAP (70), which is the other half
+  // of the bound: a cluster may loosen, but it cannot drift back inside its own
+  // day's ring, and it cannot reach the ring beyond.
+  //
+  // Sweeping it (8/12/16/20/24/30/40) keeps condition 3 at 100% throughout, so
+  // this is a choice about how loose the picture should look rather than a
+  // cliff edge. 16 roughly doubles how far a node sits from its anchor (mean
+  // 12-22px before, 24-32px after) while leaving each event's distance to its
+  // own day within 4.5% of what it was — the "距離感は保ったまま遊びを持たせる"
+  // the user asked for.
+  var ANCHOR_SLACK = 16;
+
   // Radius for a day `gap` days from today, in a window whose widest gap is
   // `span`: linear from NEAR_DAY_RING to FAR_DAY_RING, so every step out is the
   // same step further away.
@@ -369,6 +405,7 @@
       var mine = kids.get(today);
       mine.forEach(function (n, i) {
         n.anchor = polar(TODAY_RING, ANGLE_START + TAU * i / mine.length);
+        n.anchorSlack = ANCHOR_SLACK;
       });
 
       // Each other day owns a ring and an equal slice of the circle, and its
@@ -382,6 +419,7 @@
         list.forEach(function (n, i) {
           var off = list.length > 1 ? DAY_CHILD_SPREAD * (2 * i / (list.length - 1) - 1) : 0;
           n.anchor = polar(r + DAY_CHILD_GAP, a + off);
+          n.anchorSlack = ANCHOR_SLACK;
         });
       });
     }

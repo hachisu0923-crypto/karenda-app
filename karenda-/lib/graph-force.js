@@ -152,11 +152,35 @@
     // Anchors — a node the model placed is pulled back to its place. Nodes
     // without one are untouched, so a graph that anchors nothing ticks exactly
     // as it did before this force existed.
+    //
+    // `anchorSlack` (px, optional) turns the anchor from a point into a dead
+    // zone of that radius: inside it no anchor force is applied at all, so the
+    // node is free to be moved by repulsion and by its springs, and only past
+    // the rim is it pulled back. The model decides who gets how much play and
+    // why (graph-model.js); this layer only decides what play *is*.
+    //
+    // The pull is toward the nearest point on the rim, not toward the anchor
+    // itself. That keeps the force continuous — it fades to zero as a node
+    // returns to the boundary instead of jumping to full strength there — so a
+    // node pushed out settles resting against the rim rather than being
+    // snapped back to the centre, which would undo the play.
+    //
+    // Without an anchorSlack the branch below is skipped entirely: no extra
+    // arithmetic runs, so previously anchored nodes tick bit-for-bit as before.
     for (i = 0; i < n; i++) {
       a = nodes[i];
       if (!a.anchor) continue;
-      a.vx += (a.anchor.x - a.x) * o.anchorStrength * alpha;
-      a.vy += (a.anchor.y - a.y) * o.anchorStrength * alpha;
+      dx = a.anchor.x - a.x;
+      dy = a.anchor.y - a.y;
+      if (a.anchorSlack > 0) {
+        d = Math.sqrt(dx * dx + dy * dy);
+        if (d <= a.anchorSlack) continue;      // inside the play: left alone
+        f = (d - a.anchorSlack) / d;           // shorten to the rim
+        dx *= f;
+        dy *= f;
+      }
+      a.vx += dx * o.anchorStrength * alpha;
+      a.vy += dy * o.anchorStrength * alpha;
     }
 
     // Centering — pull everything toward the origin so it cannot drift away.

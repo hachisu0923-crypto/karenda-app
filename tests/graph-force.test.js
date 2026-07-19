@@ -685,3 +685,136 @@ test('a graph with no anchors ticks exactly as it did before anchors existed', (
   });
   assert.ok(plain.nodes.every(n => n.anchor === undefined), 'a plain graph must carry no anchors at all');
 });
+
+// ── the play in an anchor: a dead zone rather than a point ────────────────────
+// "予定は現状の距離感を保ち、ある程度範囲で自由に動いて" — inside anchorSlack px
+// of its anchor a node feels no anchor force at all, so repulsion and its own
+// springs place it; past the rim the anchor catches it. The model decides who
+// gets how much play (graph-model.js, ANCHOR_SLACK); these tests fix what play
+// means to the physics.
+
+test('inside its dead zone a node feels no anchor force whatsoever', () => {
+  // Not "a weak pull" — none. The check is bit-for-bit against the same node
+  // with no anchor at all, over one tick, because that is the only way to tell
+  // "no force" apart from "a force too small to see": centering still acts on
+  // both, so comparing against a standstill would prove nothing.
+  const at = extra => {
+    const s = F.createSim({ nodes: [Object.assign({ id: 'a' }, extra)], edges: [] });
+    s.nodes[0].x = 100; s.nodes[0].y = 0; s.nodes[0].vx = 0; s.nodes[0].vy = 0;
+    F.tick(s);
+    return s.nodes[0];
+  };
+  const inside = at({ anchor: { x: 110, y: 0 }, anchorSlack: 30 });   // 10px out, well inside 30
+  const none = at({});
+  assert.strictEqual(inside.x, none.x, 'a node inside its dead zone must move exactly as an unanchored one');
+  assert.strictEqual(inside.y, none.y);
+});
+
+test('outside its dead zone a node is pulled back — to the rim, not to the anchor', () => {
+  // Pulling it all the way home would undo the play: the node would rest on its
+  // anchor again and the picture would be as drilled as before. So the resting
+  // distance grows with the slack, one pixel for one pixel. Measured: an
+  // unslacked node rests 8.98px short of its anchor (centering against
+  // anchorStrength — the 97.22% in the test above), and each px of slack adds
+  // one to that.
+  const rest = slack => {
+    const s = F.createSim({ nodes: [{ id: 'a', anchor: { x: 300, y: -120 }, anchorSlack: slack }], edges: [] });
+    s.nodes[0].x = 0; s.nodes[0].y = 0;             // start it far outside the zone
+    F.settle(s);
+    return Math.hypot(s.nodes[0].x - 300, s.nodes[0].y + 120);
+  };
+  const bare = rest(0);
+  assert.ok(Math.abs(bare - 8.98) < 0.05, 'no slack must rest 8.98px short, got ' + bare.toFixed(2));
+  // It came back: it started 323px from the anchor and ends a fraction of that.
+  const r30 = rest(30);
+  assert.ok(r30 < 50, 'a node 323px out must be pulled back near its zone, got ' + r30.toFixed(1) + 'px');
+  // And it stopped at the rim rather than carrying on to the anchor.
+  assert.ok(Math.abs(r30 - (bare + 30)) < 1.5,
+    '30px of slack must rest ~30px further out than none (' + (bare + 30).toFixed(1) + '), got ' + r30.toFixed(1));
+  assert.ok(Math.abs(rest(60) - (bare + 60)) < 2,
+    'and 60px of slack ~60px further out, got ' + rest(60).toFixed(1));
+});
+
+test('a bigger dead zone always leaves a node further from its anchor', () => {
+  // Monotonicity is the property the model tunes against: ANCHOR_SLACK is
+  // chosen by sweeping it, which is only meaningful if more slack means more
+  // freedom rather than some non-monotone rearrangement.
+  const rest = slack => {
+    const s = F.createSim({ nodes: [{ id: 'a', anchor: { x: 300, y: -120 }, anchorSlack: slack }], edges: [] });
+    s.nodes[0].x = 0; s.nodes[0].y = 0;
+    F.settle(s);
+    return Math.hypot(s.nodes[0].x - 300, s.nodes[0].y + 120);
+  };
+  const ds = [0, 10, 20, 40, 80].map(rest);
+  ds.forEach((d, i) => {
+    if (i) assert.ok(d > ds[i - 1], 'slack must be monotone: got ' + ds.map(v => v.toFixed(1)).join(' '));
+  });
+});
+
+test('an anchored node with no slack behaves exactly as it always has', () => {
+  // The compatibility guarantee, counterpart of 'a graph with no anchors ticks
+  // exactly as it did before anchors existed'. A node that never asked for play
+  // must not receive any: absent, zero and negative all mean the old behaviour,
+  // and the guard is `> 0` precisely so the arithmetic is skipped rather than
+  // run with a zero in it.
+  const run = extra => {
+    const s = F.createSim({ nodes: [Object.assign({ id: 'a', anchor: { x: 300, y: -120 } }, extra)], edges: [] });
+    s.nodes[0].x = 0; s.nodes[0].y = 0;
+    F.settle(s);
+    return s.nodes[0].x + ',' + s.nodes[0].y;
+  };
+  const bare = run({});
+  assert.strictEqual(run({ anchorSlack: 0 }), bare, 'zero slack must be the old behaviour exactly');
+  assert.strictEqual(run({ anchorSlack: -5 }), bare, 'a nonsense slack must not turn into a push');
+});
+
+test('the play does not let an event drift off to another day', () => {
+  // The whole risk of the dead zone in one test, on the arrangement the model
+  // actually builds: give every node its play and every event must still be
+  // nearer its own day node than any other. Measured through the real chain
+  // rather than off the anchors, because the anchors are exactly what the play
+  // lets the nodes leave. `crowd` is the binding fixture — a crowded today
+  // inflates its own cluster toward the first ring, and the play then spends
+  // more of what little margin is left.
+  const w = week({ crowd: true });
+  const days = dayNodes(w.nodes);
+  hangers(w.nodes).forEach(n => {
+    const own = dist(n, w.nodes.find(d => d.id === 'date:' + n.key));
+    days.forEach(d => {
+      if (d.key === n.key) return;
+      assert.ok(own < dist(n, d),
+        n.id + ' settled ' + own.toFixed(1) + 'px from its own day but ' +
+        dist(n, d).toFixed(1) + 'px from ' + d.key);
+    });
+  });
+});
+
+test('the play leaves nodes scattered off their anchors, not resting on them', () => {
+  // The point of the change, stated as a number: if every node still settled on
+  // its anchor the dead zone would be decorative. Compared against the same
+  // graph with the play stripped off, so it measures the slack rather than the
+  // spread the anchor force always had — that spread is real (the assertion
+  // below checks it is non-zero) and a raw average could not tell them apart.
+  const today = '2026-07-17';
+  const day = i => `2026-07-${String(17 + i).padStart(2, '0')}`;
+  const cats = [{ id: 'c1', name: '仕事', color: '#4772b3' }];
+  const events = {}, tasks = [];
+  for (let i = 0; i < 7; i++) {
+    events[day(i)] = [{ _dbId: i * 10, catId: 'c1', title: 'A' }, { _dbId: i * 10 + 1, catId: 'c1', title: 'B' }];
+    tasks.push({ id: 't' + i, title: '課題', dueDate: day(i), done: false });
+  }
+  const drift = strip => {
+    const graph = model.buildGraph({ start: today, days: 7, events, categories: cats, tasks, today });
+    if (strip) graph.nodes.forEach(n => { delete n.anchorSlack; });
+    const sim = F.createSim(graph);
+    F.settle(sim);
+    const at = new Map(sim.nodes.map(n => [n.id, n]));
+    const kids = graph.nodes.filter(n => n.anchor && n.kind !== 'date');
+    return kids.reduce((s, n) => s + dist(at.get(n.id), n.anchor), 0) / kids.length;
+  };
+  const withPlay = drift(false), without = drift(true);
+  assert.ok(without > 0, 'sanity: the anchor force never held anything exactly on its point');
+  assert.ok(withPlay > without * 1.2,
+    'the play must visibly loosen the arrangement: ' + withPlay.toFixed(1) + 'px from the anchors with it, ' +
+    without.toFixed(1) + 'px without');
+});

@@ -164,6 +164,21 @@
     };
   }
 
+  // ── project ───────────────────────────────────────────────────────────────
+  // A project's name is also its Obsidian note name, so the body is the name:
+  // the note reads as itself in the vault, not as a record about something else.
+
+  function projectToNote(project) {
+    return buildNote({
+      type: 'karenda-project',
+      project_id: project.id,
+      name: project.name || '',
+      color: project.color || '',
+      archived: !!project.archived,
+      tags: ['karenda/project'],
+    }, project.name || '');
+  }
+
   // Obsidian forbids \ / : * ? " < > | in file names.
   function safeFileName(s) {
     return String(s == null ? '' : s).replace(/[\\/:*?"<>|]/g, '-').replace(/\s+/g, ' ').trim().slice(0, 80);
@@ -179,6 +194,7 @@
     taskFromNote: taskFromNote,
     goalToNote: goalToNote,
     goalFromNote: goalFromNote,
+    projectToNote: projectToNote,
     safeFileName: safeFileName,
   };
   if (typeof module !== 'undefined' && module.exports) {

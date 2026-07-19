@@ -7,6 +7,7 @@ const assert = require('node:assert');
 const {
   toFrontMatter, parseNote, buildNote,
   budgetToNote, budgetFromNote, taskToNote, taskFromNote, goalToNote, goalFromNote,
+  projectToNote,
   safeFileName,
 } = require('../karenda-/lib/md-note.js');
 
@@ -119,4 +120,33 @@ test('safeFileName strips characters Obsidian forbids in file names', () => {
 
 test('safeFileName tolerates null', () => {
   assert.strictEqual(safeFileName(null), '');
+});
+
+// ── project ──────────────────────────────────────────────────────────────────
+
+test('projectToNote writes the fields a vault needs to identify the project', () => {
+  const note = projectToNote({ id: 'p_1', name: '山田邸新築', color: '#7c6cf5', archived: false });
+  assert.ok(note.includes('type: karenda-project'), note);
+  assert.ok(note.includes('project_id: p_1'), note);
+  assert.ok(note.includes('name: 山田邸新築'), note);
+  assert.ok(note.includes('archived: false'), note);
+  assert.ok(note.includes('tags: [karenda/project]'), note);
+});
+
+test('projectToNote puts the name in the body, so the note reads as itself', () => {
+  const note = projectToNote({ id: 'p_1', name: '山田邸新築', color: '#7c6cf5', archived: false });
+  assert.ok(note.trimEnd().endsWith('山田邸新築'),
+    'the body should be the project name, got: ' + JSON.stringify(note.slice(-40)));
+});
+
+test('projectToNote quotes a colour so YAML does not read # as a comment', () => {
+  const note = projectToNote({ id: 'p_1', name: 'X', color: '#7c6cf5', archived: false });
+  assert.ok(note.includes('color: "#7c6cf5"'),
+    'a bare #7c6cf5 would be swallowed as a YAML comment, got: ' + note);
+});
+
+test('projectToNote survives a project with no colour and no archived flag', () => {
+  const note = projectToNote({ id: 'p_2', name: 'Rust 勉強' });
+  assert.ok(note.includes('project_id: p_2'), note);
+  assert.ok(note.includes('archived: false'), 'a missing flag must default to false, got: ' + note);
 });

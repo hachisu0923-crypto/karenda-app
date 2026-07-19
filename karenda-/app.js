@@ -4478,6 +4478,17 @@ async function updateProjectInSupabase(project) {
   } catch (e) { console.error('Project update error:', e); setSyncStatus('error'); }
 }
 
+async function deleteProjectFromSupabase(project) {
+  if (!currentUser) return;
+  setSyncStatus('syncing');
+  try {
+    const { error } = await db.from('projects').delete()
+      .eq('user_id', currentUser.id).eq('project_id', project.id);
+    if (error) throw error;
+    setSyncStatus('synced');
+  } catch (e) { console.error('Project delete error:', e); setSyncStatus('error'); }
+}
+
 // アーカイブ済みは選択肢に出さない。削除は用意しない（設計どおり）。
 function activeProjects() {
   return projects.filter(p => !p.archived);
@@ -4506,9 +4517,33 @@ function renderProjectSettings() {
         </div>
       </div>
       <div class="setting-item-control">
+        <button class="btn-secondary" data-project-action="edit">編集</button>
         <button class="btn-secondary" data-project-action="archive">${p.archived ? '戻す' : 'アーカイブ'}</button>
+        <button class="btn-secondary" data-project-action="delete" style="color:var(--color-danger)">削除</button>
       </div>
     </div>`).join('');
+}
+
+// プロジェクト行をインライン編集フォームに置き換える（_openTaskEditForm と同じ流儀）
+function _openProjectEditForm(row, project) {
+  row.classList.add('is-editing');
+  row.innerHTML =
+    `<div class="task-edit-form">` +
+    `<input class="task-edit-title project-edit-name" type="text" value="${escapeHtml(project.name)}" placeholder="プロジェクト名" maxlength="100">` +
+    `<div class="task-edit-row">` +
+    `<input class="form-input project-edit-color" type="color" value="${escapeHtml(project.color || '#7c6cf5')}" style="width:48px;padding:2px;flex:0 0 48px;">` +
+    `</div>` +
+    `<div class="task-edit-actions">` +
+    `<button class="task-edit-save" type="button" data-project-action="save-edit">保存</button>` +
+    `<button class="task-edit-cancel" type="button" data-project-action="cancel-edit">キャンセル</button>` +
+    `</div></div>`;
+  const nameInput = row.querySelector('.project-edit-name');
+  nameInput?.focus();
+  nameInput?.select();
+  nameInput?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); row.querySelector('[data-project-action="save-edit"]')?.click(); }
+    if (e.key === 'Escape') row.querySelector('[data-project-action="cancel-edit"]')?.click();
+  });
 }
 
 // タスクフォームと絞り込みの選択肢を projects から埋め直す。
@@ -4565,10 +4600,65 @@ function initProjectSettings() {
     const row = btn.closest('[data-project-id]');
     const p = projectById(row?.dataset.projectId);
     if (!p) return;
-    p.archived = !p.archived;
-    renderProjectSettings();
-    renderTaskPanel();
-    await updateProjectInSupabase(p);
+    const action = btn.dataset.projectAction;
+
+    if (action === 'archive') {
+      p.archived = !p.archived;
+      renderProjectSettings();
+      renderTaskPanel();
+      await updateProjectInSupabase(p);
+      return;
+    }
+
+    if (action === 'edit') {
+      _openProjectEditForm(row, p);
+      return;
+    }
+
+    if (action === 'cancel-edit') {
+      renderProjectSettings();
+      return;
+    }
+
+    if (action === 'save-edit') {
+      const nameInput = row.querySelector('.project-edit-name');
+      const colorInput = row.querySelector('.project-edit-color');
+      const newName = (nameInput?.value || '').trim();
+      if (!newName) { nameInput?.focus(); return; }
+      p.name = newName;
+      p.color = colorInput?.value || p.color;
+      renderProjectSettings();
+      renderTaskPanel();
+      await updateProjectInSupabase(p);
+      return;
+    }
+
+    if (action === 'delete') {
+      const affected = (_taskState?.tasks || []).filter(t => t.projectId === p.id);
+      const message = affected.length > 0
+        ? `「${p.name}」を削除します。このプロジェクトのタスク ${affected.length} 件も削除されます。元に戻せません。`
+        : `「${p.name}」を削除します。元に戻せません。`;
+      const ok = await appConfirm(message, '削除');
+      if (!ok) return;
+
+      let hasDueDate = false;
+      if (_taskState) {
+        for (const t of affected) {
+          if (t.dueDate) hasDueDate = true;
+        }
+        _taskState.tasks = _taskState.tasks.filter(t => t.projectId !== p.id);
+        for (const t of affected) {
+          await deleteTaskFromSupabase(t.id);
+        }
+        _persistTasks();
+      }
+      projects = projects.filter(pr => pr.id !== p.id);
+      await deleteProjectFromSupabase(p);
+      renderProjectSettings();
+      renderTaskPanel();
+      if (hasDueDate) renderMain();
+      return;
+    }
   });
 }
 

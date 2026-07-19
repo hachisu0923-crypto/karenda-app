@@ -63,7 +63,7 @@ alter table public.tasks add column if not exists project_id text;
 
 null 可。**既存タスクの移行は不要**（全て null = 未分類として扱う）。
 
-`projects.project_id` への外部キーは張らない。既存のアプリ間テーブルが一貫して FK を張らない方針（`events.cat_id` も FK ではない）に合わせる。プロジェクト削除時の後始末はアプリ側で行う（下記）。
+`projects.project_id` への外部キーは張らない。既存のアプリ間テーブルが一貫して FK を張らない方針（`events.cat_id` も FK ではない）に合わせる。プロジェクトは削除せずアーカイブのみとするため（後述「画面」節）、参照が宙に浮く事態は起きない。
 
 ### アプリ内の形
 

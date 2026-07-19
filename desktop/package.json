@@ -1,6 +1,6 @@
 {
   "name": "karenda-desktop",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "My Calendar (karenda) — Windows desktop wrapper (mobile/phone layout)",
   "main": "main.js",
   "author": "karenda",

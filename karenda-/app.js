@@ -4509,6 +4509,30 @@ function renderProjectSettings() {
     </div>`).join('');
 }
 
+// タスクフォームと絞り込みの選択肢を projects から埋め直す。
+// アーカイブ済みは新規割り当ての選択肢に出さないが、絞り込みには出す
+// （アーカイブしても、そのタスクを探せなくなっては困る）。
+function renderProjectSelects() {
+  const formSel = document.getElementById('js-task-project');
+  if (formSel) {
+    const keep = formSel.value;
+    formSel.innerHTML = '<option value="">未分類</option>'
+      + activeProjects().map(p =>
+          `<option value="${escAttr(p.id)}">${escHtmlLocal(p.name)}</option>`).join('');
+    formSel.value = keep;                       // 選択が消えていたら '' に戻る
+  }
+  const filterSel = document.getElementById('js-task-project-filter');
+  if (filterSel) {
+    const keep = filterSel.value;
+    filterSel.innerHTML = '<option value="all">全プロジェクト</option>'
+      + '<option value="none">未分類</option>'
+      + projects.map(p =>
+          `<option value="${escAttr(p.id)}">${escHtmlLocal(p.name)}${p.archived ? '（済）' : ''}</option>`).join('');
+    filterSel.value = keep || 'all';
+    if (!filterSel.value) filterSel.value = 'all';
+  }
+}
+
 // 属性値に入れる文字列のエスケープ。lib/md-inline.js の escHtml は本文向けで
 // ここには読み込まれていないので、この2つはローカルに持つ。
 function escAttr(s) {
@@ -4585,8 +4609,10 @@ async function initTaskPanel(user) {
   }
 
   _taskState = {
-    userId, tasks, filter: 'all',
-    els: { listEl, formEl, inputEl, dateEl, priorityEl, progressEl }
+    userId, tasks, filter: 'all', projectFilter: 'all',
+    els: { listEl, formEl, inputEl, dateEl, priorityEl, progressEl,
+           projectEl: document.getElementById('js-task-project'),
+           projectFilterEl: document.getElementById('js-task-project-filter') }
   };
 
   renderTaskPanel();
@@ -4602,7 +4628,8 @@ async function initTaskPanel(user) {
     const id = `t_${Date.now()}_${Math.random().toString(16).slice(2)}`;
     const dueDate  = dateEl?.value || '';
     const priority = priorityEl?.value || 'medium';
-    const task = { id, title, dueDate, priority, done: false, createdAt: Date.now() };
+    const projectId = _taskState.els.projectEl?.value || '';
+    const task = { id, title, dueDate, priority, projectId, done: false, createdAt: Date.now() };
     _taskState.tasks.unshift(task);
     inputEl.value = '';
     if (dateEl) dateEl.value = '';
@@ -4677,6 +4704,16 @@ async function initTaskPanel(user) {
       renderTaskPanel();
     });
   });
+
+  // プロジェクト絞り込み
+  const pfEl = document.getElementById('js-task-project-filter');
+  if (pfEl) {
+    pfEl.addEventListener('change', () => {
+      if (!_taskState) return;
+      _taskState.projectFilter = pfEl.value || 'all';
+      renderTaskPanel();
+    });
+  }
 }
 
 function _persistTasks() {
@@ -4691,7 +4728,8 @@ function _todayStr() {
 
 function renderTaskPanel() {
   if (!_taskState) return;
-  const { tasks, filter, els } = _taskState;
+  renderProjectSelects();
+  const { tasks, filter, projectFilter, els } = _taskState;
 
   // Sort: undone first (high > medium > low, then by due date), done last
   const sorted = [...tasks].sort((a, b) => {
@@ -4707,8 +4745,11 @@ function renderTaskPanel() {
   });
 
   const filtered = sorted.filter(t => {
-    if (filter === 'active') return !t.done;
-    if (filter === 'done')   return t.done;
+    if (filter === 'active' && t.done)  return false;
+    if (filter === 'done'   && !t.done) return false;
+    if (projectFilter === 'none' && t.projectId) return false;
+    if (projectFilter && projectFilter !== 'all' && projectFilter !== 'none'
+        && t.projectId !== projectFilter) return false;
     return true;
   });
 
@@ -4752,6 +4793,9 @@ function renderTaskPanel() {
           <div class="task-title" title="${escapeHtml(t.title)}">${escapeHtml(t.title)}</div>
           <div class="task-meta">
             ${dueMeta}
+            ${t.projectId && projectById(t.projectId)
+              ? `<span class="task-project" style="color:${escAttr(projectById(t.projectId).color)}">${escHtmlLocal(projectById(t.projectId).name)}</span>`
+              : ''}
             <span class="task-priority-label ${pClass}">${pLabel}</span>
           </div>
         </div>

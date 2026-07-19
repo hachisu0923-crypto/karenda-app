@@ -464,6 +464,9 @@
         <button class="task-filter is-active" data-filter="all">すべて</button>
         <button class="task-filter" data-filter="active">未完了</button>
         <button class="task-filter" data-filter="done">完了</button>
+        <select class="budget-select" id="js-task-project-filter" style="width:110px;margin-left:auto">
+          <option value="all">全プロジェクト</option>
+        </select>
       </div>
       <div class="task-list" id="js-task-list"></div>
       <form class="bp-add-form" id="js-task-add-form" autocomplete="off">
@@ -473,6 +476,9 @@
           <option value="high">高</option>
           <option value="medium" selected>中</option>
           <option value="low">低</option>
+        </select>
+        <select class="budget-select" id="js-task-project" style="width:110px">
+          <option value="">未分類</option>
         </select>
         <button class="bp-add-btn" type="submit">追加</button>
       </form>

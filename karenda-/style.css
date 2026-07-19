@@ -3899,6 +3899,14 @@ body.is-phone .status-bar { display: none; }
 .task-due.is-past  { color: var(--color-danger); font-weight: 600; }
 .task-due.is-today { color: var(--color-accent); font-weight: 600; }
 
+.task-project {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--color-base-25);
+  white-space: nowrap;
+}
+
 .task-priority-label {
   font-size: 10px; font-weight: 600; padding: 0 5px;
   border-radius: 3px;

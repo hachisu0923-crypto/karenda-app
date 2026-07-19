@@ -6169,6 +6169,18 @@ async function vaultExport() {
       _vaultLog(`タスク ${tn} 件を書き出しました`);
     }
 
+    // Projects — 名前がそのまま Obsidian のノート名になる。
+    if (projects.length) {
+      const pd = await vaultFs.dir(base, 'projects', true);
+      let pn = 0;
+      for (const p of projects) {
+        const fname = mdNote.safeFileName(p.name || p.id) + '.md';
+        await vaultFs.writeFile(pd, fname, mdNote.projectToNote(p));
+        pn++;
+      }
+      _vaultLog(`プロジェクト ${pn} 件を書き出しました`);
+    }
+
     // Goals — localStorage only, so this is the only way they leave the device.
     if (currentUser) {
       const goals = _loadGoal(currentUser.id) || {};

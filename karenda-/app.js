@@ -4489,7 +4489,7 @@ async function deleteProjectFromSupabase(project) {
   } catch (e) { console.error('Project delete error:', e); setSyncStatus('error'); }
 }
 
-// アーカイブ済みは選択肢に出さない。削除は用意しない（設計どおり）。
+// アーカイブ済みは選択肢に出さない（削除は設定→プロジェクトの「削除」から可能）。
 function activeProjects() {
   return projects.filter(p => !p.archived);
 }

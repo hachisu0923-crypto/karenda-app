@@ -29,17 +29,17 @@
 
   // How much harder today's day node holds onto its own events and tasks.
   // The force layer reads a link's weight as "shorter and stiffer" — rest
-  // length is linkDistance / weight, so 4 gathers today's cluster to ~63px
-  // (it settles at 73-80px once its own items repel each other) while every
+  // length is linkDistance / weight, so 5 gathers today's cluster to 50px
+  // (it settles at 66-82px once its own items repel each other) while every
   // other day stays at the usual 250.
   //
   // This has to stay above DAY_CHILD_WEIGHT below, or another day would hold
   // its events more tightly than today holds its own — the inversion the two
   // "linked to its day more heavily" tests catch. It is also what makes the
   // rest of the picture compact: today's cluster radius is what the first ring
-  // has to clear, so pulling today in from ~110px to ~78px is what let
-  // NEAR_DAY_RING come down from 240 to 190.
-  var TODAY_LINK_WEIGHT = 4;
+  // has to clear, so pulling today in (~110px at 3, ~78px at 4, 66-82px at 5)
+  // is what let NEAR_DAY_RING come down 240 -> 190 -> 155.
+  var TODAY_LINK_WEIGHT = 5;
 
   // The graph shows this many days, starting at today. Seven is the user's ask
   // ("その日から7日以内"): today plus the six days after it, not today + 7.
@@ -75,7 +75,7 @@
 
   // Today's own events, tasks and notes: one ring just outside today itself.
   // Same distance TODAY_LINK_WEIGHT already asked for, so anchor and spring agree.
-  var TODAY_RING = LINK_DISTANCE / TODAY_LINK_WEIGHT;   // ~83px
+  var TODAY_RING = LINK_DISTANCE / TODAY_LINK_WEIGHT;   // 50px
 
   // The other days. The nearest ring starts well outside today's own cluster: if
   // tomorrow came in closer, the picture would say tomorrow matters more than
@@ -88,24 +88,35 @@
   // bearing as tomorrow, is nearer tomorrow than today the moment rc > R1 - rc.
   // The "twice the inner ring" rule of thumb is only a rule of thumb; the real
   // limit was measured by walking NEAR_DAY_RING down and watching the margin by
-  // which each event beats the next day to its own day. With today's cluster
-  // pulled in to ~78px (TODAY_LINK_WEIGHT above) that margin goes negative at
-  // 145, so 190 sits 45px clear of a measured break rather than of a guess.
+  // which each event beats the next day to its own day.
+  //
+  // Two things move that break point, and both had to move to get here:
+  //   - TODAY_LINK_WEIGHT, which sets how fat today's cluster is. At 4 the
+  //     margin went negative around 155; at 5 it is still +21px at 150.
+  //   - FAR_DAY_RING, which is not independent of it. The break point measured
+  //     at 145 when FAR was 290 came back up to ~157 once FAR was pulled in to
+  //     230, because the rings in between close up with it. A break point is
+  //     only valid for the other constants it was measured with.
+  // 160 is measured to keep the margin at 23-86px across six fixtures.
+  //
+  // FAR is not free either: the "rim reads as a different distance" test wants
+  // FAR / NEAR > 1.5, which is why the pair is 160/242 and not a rounder 160/240
+  // (exactly 1.5, and the test asks for strictly more).
   //
   // The lesson from the measurement: the first ring is not held by its own
   // value but by how fat today's cluster is. Tightening today buys ring room
   // at a better rate than shrinking the rings does.
-  var NEAR_DAY_RING = 190;   // a gap of one day
-  var FAR_DAY_RING = 290;    // the widest gap the window holds
+  var NEAR_DAY_RING = 160;   // a gap of one day
+  var FAR_DAY_RING = 242;    // the widest gap the window holds
 
   // How far beyond its own day a day's events and tasks sit, and how wide a
   // sector they fan across (radians either side of the day's own direction).
-  // The gap has to clear the day-to-day ring spacing ((290-190)/5 = 20px) by
+  // The gap has to clear the day-to-day ring spacing ((242-160)/5 = 16px) by
   // enough that a cluster reads as belonging to its day rather than to the next
   // ring out; the sector has to stay well inside the 60° each day owns. Rings
   // are 60° apart, so a cluster is never on the same bearing as another ring —
-  // measured, the nearest day node to any event is always its own, by 35px at
-  // the thinnest (a today holding 8 events, 8 notes and 4 tasks).
+  // measured, the nearest day node to any event is always its own, by 17.7px at
+  // the thinnest (a today holding 20 events).
   //
   // Shrinking this does not shrink today's cluster, which hangs off
   // TODAY_LINK_WEIGHT instead: it only pulls the other days' events in, so it
@@ -135,8 +146,8 @@
   // and 4 tasks), which caps slack at ~17px if the worst direction actually
   // happened. It does not — repulsion pushes a crowded node outward, away from
   // the rival day rather than at it — so the measured cost at 16 is about 11px,
-  // not 32: the thinnest margin lands at 26.2px, still comfortably positive
-  // across all four fixtures.
+  // not 32: after the rings were tightened again the thinnest margin lands at
+  // 17.7px, still positive across all six fixtures.
   //
   // 16 is also under a quarter of DAY_CHILD_GAP (70), which is the other half
   // of the bound: a cluster may loosen, but it cannot drift back inside its own

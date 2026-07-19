@@ -4368,6 +4368,7 @@ async function loadTasksFromSupabase(userId) {
       id: r.task_id, _dbId: r.id,
       title: r.title, done: r.done,
       dueDate: r.due_date || '', priority: r.priority || 'medium',
+      projectId: r.project_id || '',
       createdAt: new Date(r.created_at).getTime()
     }));
   } catch (e) {
@@ -4384,7 +4385,8 @@ async function addTaskToSupabase(task) {
     const { data, error } = await db.from('tasks').insert({
       user_id: currentUser.id, task_id: task.id,
       title: task.title, done: task.done,
-      due_date: task.dueDate || '', priority: task.priority || 'medium'
+      due_date: task.dueDate || '', priority: task.priority || 'medium',
+      project_id: task.projectId || null
     }).select().single();
     if (error) throw error;
     task._dbId = data.id;
@@ -4400,7 +4402,8 @@ async function updateTaskInSupabase(task) {
       done: task.done,
       title: task.title,
       due_date: task.dueDate || '',
-      priority: task.priority || 'medium'
+      priority: task.priority || 'medium',
+      project_id: task.projectId || null
     }).eq('id', task._dbId);
     if (error) throw error;
     setSyncStatus('synced');

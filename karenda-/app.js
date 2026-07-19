@@ -6204,6 +6204,21 @@ function _vaultSetPath(name) {
   if (el) el.textContent = name || '未選択';
 }
 
+// 非対応環境（showDirectoryPicker が無い iOS Safari / Firefox 等）向け。
+// 設定モーダルの Vault ペインは静的 HTML のままなので、initVault が早期
+// return してもタブ・ボタンは残ってしまう。ここで理由と代替手段を表示し、
+// ボタンは disabled にして「押しても無反応」を無くす。
+function _vaultShowUnsupported() {
+  const notice = document.getElementById('js-vault-unsupported-notice');
+  if (notice) notice.style.display = '';
+  const pathEl = document.getElementById('js-vault-path');
+  if (pathEl) pathEl.textContent = '利用できません（このブラウザは非対応）';
+  ['js-vault-pick', 'js-vault-export', 'js-vault-import'].forEach((id) => {
+    const btn = document.getElementById(id);
+    if (btn) btn.disabled = true;
+  });
+}
+
 // Ensure we have a handle AND live permission. Both the picker and the
 // permission re-prompt need a user gesture, so only call this from a click.
 async function _vaultReady() {
@@ -6382,7 +6397,16 @@ async function vaultImport() {
 (function initVault() {
   const ribbonBtn = document.getElementById('js-ribbon-vault');
   // Feature-gate the whole entry point (iOS Safari / Firefox have no picker).
-  if (!vaultFs.isSupported()) { if (ribbonBtn) ribbonBtn.remove(); return; }
+  // The ribbon entry point is removed (its only purpose is opening the
+  // settings pane, and the tab itself is still reachable from Settings),
+  // but the vault-settings pane is static markup in index.html and can't be
+  // removed the same way — show a reason + workaround there instead so the
+  // buttons never sit there doing nothing when clicked.
+  if (!vaultFs.isSupported()) {
+    if (ribbonBtn) ribbonBtn.remove();
+    _vaultShowUnsupported();
+    return;
+  }
   if (ribbonBtn) ribbonBtn.hidden = false;
 
   ribbonBtn?.addEventListener('click', async () => {

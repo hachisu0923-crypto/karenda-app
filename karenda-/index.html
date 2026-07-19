@@ -1059,6 +1059,9 @@
         <div class="vertical-tab-nav-item" data-settings-tab="jcb" role="tab" tabindex="0">
           <svg class="svg-icon"><use href="#lucide-credit-card"/></svg><span>JCB連携</span>
         </div>
+        <div class="vertical-tab-nav-item" data-settings-tab="project" role="tab" tabindex="0">
+          <svg class="svg-icon"><use href="#lucide-tag"/></svg><span>プロジェクト</span>
+        </div>
         <div class="vertical-tab-nav-item" data-settings-tab="vault" role="tab" tabindex="0">
           <svg class="svg-icon"><use href="#lucide-list-tree"/></svg><span>Obsidian Vault</span>
         </div>
@@ -1130,6 +1133,20 @@
         <div class="setting-pane-footer">
           <button class="btn-primary" style="width:auto;padding:7px 18px;" id="js-jcb-ok">閉じる</button>
         </div>
+      </div>
+      <div class="vertical-tab-content" data-settings-tab="project" style="display:none">
+        <div class="setting-item setting-item-heading">
+          <div class="setting-item-info">
+            <div class="setting-item-name">プロジェクト</div>
+            <div class="setting-item-description">タスクを束ねる作業テーマ。名前はそのまま Obsidian のノート名として使えます。</div>
+          </div>
+        </div>
+        <div id="js-project-list"></div>
+        <form class="bp-add-form" id="js-project-add-form" autocomplete="off">
+          <input class="bp-add-input" id="js-project-input" type="text" placeholder="プロジェクト名を追加…" />
+          <input class="form-input" id="js-project-color" type="color" value="#7c6cf5" style="width:48px;padding:2px" />
+          <button class="bp-add-btn" type="submit">追加</button>
+        </form>
       </div>
       <div class="vertical-tab-content" data-settings-tab="vault" style="display:none">
         <div class="setting-item setting-item-heading">

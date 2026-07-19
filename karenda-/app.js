@@ -108,6 +108,7 @@ const DEFAULT_CATEGORIES = [
 let categories     = [];
 let events         = {};          // { dateKey: [ eventObj, … ] }
 let projects       = [];   // [{id, _dbId, name, color, archived, createdAt}] 作業テーマ
+let _projectSettingsInited = false;
 let overtimeCashouts = [];        // [{ id, catId, minutes, note, dateKey, createdAt }]
 let dailyDrinks      = {};        // { dateKey: count }
 let curDate        = new Date();
@@ -4485,6 +4486,78 @@ function projectById(id) {
   return projects.find(p => p.id === id) || null;
 }
 
+// 設定のプロジェクトペイン。アーカイブ済みは薄く表示し、戻せるようにする。
+function renderProjectSettings() {
+  const listEl = document.getElementById('js-project-list');
+  if (!listEl) return;
+  if (!projects.length) {
+    listEl.innerHTML = '<div class="setting-item"><div class="setting-item-info">'
+      + '<div class="setting-item-description">まだプロジェクトがありません。</div></div></div>';
+    return;
+  }
+  listEl.innerHTML = projects.map(p => `
+    <div class="setting-item" data-project-id="${escAttr(p.id)}"${p.archived ? ' style="opacity:.5"' : ''}>
+      <div class="setting-item-info">
+        <div class="setting-item-name">
+          <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${escAttr(p.color)};margin-right:6px"></span>
+          ${escHtmlLocal(p.name)}
+        </div>
+      </div>
+      <div class="setting-item-control">
+        <button class="btn-secondary" data-project-action="archive">${p.archived ? '戻す' : 'アーカイブ'}</button>
+      </div>
+    </div>`).join('');
+}
+
+// 属性値に入れる文字列のエスケープ。lib/md-inline.js の escHtml は本文向けで
+// ここには読み込まれていないので、この2つはローカルに持つ。
+function escAttr(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function escHtmlLocal(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function initProjectSettings() {
+  if (_projectSettingsInited) return;
+  _projectSettingsInited = true;
+  const formEl  = document.getElementById('js-project-add-form');
+  const inputEl = document.getElementById('js-project-input');
+  const colorEl = document.getElementById('js-project-color');
+  const listEl  = document.getElementById('js-project-list');
+  if (!formEl || !inputEl || !listEl) return;
+
+  formEl.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name = (inputEl.value || '').trim();
+    if (!name) return;
+    const project = {
+      id: `p_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+      name, color: colorEl?.value || '#7c6cf5',
+      archived: false, createdAt: Date.now(),
+    };
+    projects.push(project);
+    inputEl.value = '';
+    renderProjectSettings();
+    renderTaskPanel();               // 絞り込みの選択肢を更新する
+    await addProjectToSupabase(project);
+  });
+
+  listEl.addEventListener('click', async (e) => {
+    const btn = e.target.closest?.('[data-project-action]');
+    if (!btn) return;
+    const row = btn.closest('[data-project-id]');
+    const p = projectById(row?.dataset.projectId);
+    if (!p) return;
+    p.archived = !p.archived;
+    renderProjectSettings();
+    renderTaskPanel();
+    await updateProjectInSupabase(p);
+  });
+}
+
 async function initTaskPanel(user) {
   const listEl     = document.getElementById('js-task-list');
   const formEl     = document.getElementById('js-task-add-form');
@@ -4502,6 +4575,8 @@ async function initTaskPanel(user) {
   } else {
     projects = [];
   }
+  renderProjectSettings();
+  initProjectSettings();
   let tasks;
   if (userId !== 'anon') {
     tasks = await loadTasksFromSupabase(userId) ?? loadTasks(userId);

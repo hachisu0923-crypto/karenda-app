@@ -109,6 +109,7 @@ let categories     = [];
 let events         = {};          // { dateKey: [ eventObj, … ] }
 let projects       = [];   // [{id, _dbId, name, color, archived, createdAt}] 作業テーマ
 let _projectSettingsInited = false;
+let _taskProjectFilterInited = false;
 let overtimeCashouts = [];        // [{ id, catId, minutes, note, dateKey, createdAt }]
 let dailyDrinks      = {};        // { dateKey: count }
 let curDate        = new Date();
@@ -4707,7 +4708,8 @@ async function initTaskPanel(user) {
 
   // プロジェクト絞り込み
   const pfEl = document.getElementById('js-task-project-filter');
-  if (pfEl) {
+  if (pfEl && !_taskProjectFilterInited) {
+    _taskProjectFilterInited = true;
     pfEl.addEventListener('change', () => {
       if (!_taskState) return;
       _taskState.projectFilter = pfEl.value || 'all';

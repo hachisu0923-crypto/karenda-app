@@ -37,6 +37,38 @@
   // ("その日から7日以内"): today plus the six days after it, not today + 7.
   var WINDOW_DAYS = 7;
 
+  // ── how far each of the other days sits from today ───────────────────────────
+  // "その日に関係すること次第で近くする" — relatedness here is nearness in time,
+  // so the week reads as rings around today: tomorrow innermost, the sixth day
+  // out at the rim.
+  //
+  // A weight is the only lever the model has over distance (the force layer
+  // makes a link's rest length linkDistance / weight), so to aim a link at a
+  // number of pixels the model has to know what it is dividing — hence this
+  // copy of graph-force's default linkDistance. It is a target, not a promise:
+  // repulsion from the rest of the graph moves the settled positions somewhat.
+  var LINK_DISTANCE = 250;
+  // The nearest ring starts outside today's own cluster (TODAY_LINK_WEIGHT puts
+  // today's events and tasks at ~83px). If tomorrow came in closer than that,
+  // the picture would say tomorrow matters more than today's own schedule.
+  var NEAR_DAY_REST = 130;   // a gap of one day
+  var FAR_DAY_REST = 400;    // the widest gap the window holds
+
+  // Rest length for a day `gap` days from today, in a window whose widest gap is
+  // `span`: linear from NEAR_DAY_REST to FAR_DAY_REST, so every step out is the
+  // same step further away.
+  function dayLinkWeight(gap, span) {
+    var rest = span > 1
+      ? NEAR_DAY_REST + (FAR_DAY_REST - NEAR_DAY_REST) * (gap - 1) / (span - 1)
+      : NEAR_DAY_REST;
+    return LINK_DISTANCE / rest;
+  }
+
+  // How big today's day node is drawn. nodeRadius clamps at 14, so today would
+  // otherwise be indistinguishable from any well-connected node; the user asked
+  // for it to read as the centre at a glance ("今日の日付を紫で大きくして").
+  var TODAY_RADIUS = 18;
+
   function pad2(n) { return String(n).padStart(2, '0'); }
 
   // 'YYYY-MM-DD' + n days -> 'YYYY-MM-DD'. Date does the calendar arithmetic, so
@@ -118,8 +150,9 @@
     // week look busier than it is.
     // inWindow also decides which events and tasks survive below, so there is
     // one definition of "in range" rather than three.
-    var inWindow = new Set();
-    for (var i = 0; start && i < days; i++) inWindow.add(addDays(start, i));
+    var windowKeys = [];
+    for (var i = 0; start && i < days; i++) windowKeys.push(addDays(start, i));
+    var inWindow = new Set(windowKeys);
 
     inWindow.forEach(function (key) {
       // The label is the day of the month, as the month grid writes it: the
@@ -139,6 +172,25 @@
       if (key === today) day.pinned = true;
       add(day);
     });
+
+    // ── today -> each other day in the window ───────────────────────────────
+    // A star, never a chain: every edge starts at today, and no two other days
+    // are ever linked to each other. A chain (17-18-19-20) would let the far
+    // end of the week wander off on its own thread; a star makes the distance
+    // from the centre mean one thing only — how many days away it is.
+    //
+    // The weight falls as the gap grows, so the rest length grows with it and
+    // the days settle into rings. Weights below 1 are intended here: a distant
+    // day is held by a long, slack spring, which is exactly "less related".
+    var todayIdx = today ? windowKeys.indexOf(today) : -1;
+    if (todayIdx >= 0) {
+      var span = windowKeys.length - 1;              // the widest gap on show
+      windowKeys.forEach(function (key, idx) {
+        var gap = Math.abs(idx - todayIdx);
+        if (gap === 0) return;                       // no self-loop on today
+        link('date:' + today, 'date:' + key, dayLinkWeight(gap, span));
+      });
+    }
 
     // ── event nodes ─────────────────────────────────────────────────────────
     Object.keys(events).forEach(function (key) {
@@ -223,6 +275,11 @@
       adj.get(e.target).add(e.source);
     });
     nodes.forEach(function (n) { n.r = nodeRadius(n.degree); });
+    // Today is sized by what it is, not by how many links it happens to have:
+    // nodeRadius clamps at 14 and today's six day edges alone would push it
+    // there, leaving it the same size as any busy category. Applied after the
+    // degree pass so it is the last word.
+    nodes.forEach(function (n) { if (n.pinned) n.r = TODAY_RADIUS; });
 
     return { nodes: nodes, edges: edges, adj: adj };
   }
@@ -232,6 +289,7 @@
     nodeRadius: nodeRadius,
     hitTest: hitTest,
     WINDOW_DAYS: WINDOW_DAYS,
+    TODAY_RADIUS: TODAY_RADIUS,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.graphModel = api;

@@ -419,3 +419,37 @@ test('a realistic month (190 nodes) converges without blowing up', () => {
   // pathological regression, not a benchmark.
   assert.ok(ms < 3000, `${ticks} ticks took ${ms.toFixed(0)}ms`);
 });
+
+test("the week settles into rings: a day further from today lands further out", () => {
+  // The model's falling weights are only a means; what the user asked to see
+  // ("その日に関係すること次第で近くして") is the settled picture. Weights that
+  // decrease monotonically do not by themselves prove distances that increase
+  // monotonically, because repulsion and centering also move a node — so this
+  // measures the geometry the eye gets, through the real model weights.
+  //
+  // The week is bare on purpose. A day's own events hang off it on stiffer
+  // springs (weight 1) than the slack tether that holds a far day to today
+  // (weight 0.625 at the rim), so a loaded outermost day gets dragged inward by
+  // its own contents: measured, a week whose only load sits on the sixth day
+  // out puts that day at 275px, inside the fifth day's 304px. That is a real
+  // limit of the design, recorded here rather than asserted away; this test
+  // pins the ring structure itself, which is what the weights control.
+  const start = '2026-07-19';
+  const graph = require('../karenda-/lib/graph-model.js')
+    .buildGraph({ start: start, days: 7, today: start });
+  const sim = F.createSim(graph);
+  F.settle(sim);
+  const today = sim.nodes.find(n => n.pinned);
+  const rings = sim.nodes
+    .filter(n => n.kind === 'date' && !n.pinned)
+    .sort((a, b) => a.key.localeCompare(b.key))
+    .map(n => Math.hypot(n.x - today.x, n.y - today.y));
+  assert.strictEqual(rings.length, 6, `a 7-day window has six other days, got ${rings.length}`);
+  for (let i = 1; i < rings.length; i++) {
+    assert.ok(rings[i] > rings[i - 1],
+      `day ${i + 1} out must settle further than day ${i}; rings are [${rings.map(r => r.toFixed(1)).join(', ')}]`);
+  }
+  // And the nearest ring clears today's own cluster (~83px, TODAY_LINK_WEIGHT).
+  assert.ok(rings[0] > 100,
+    `tomorrow must settle outside today's own cluster, got ${rings[0].toFixed(1)}px`);
+});

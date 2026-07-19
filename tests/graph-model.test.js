@@ -8,7 +8,7 @@
 // from the clock: a model that read new Date() must fail here, not next week.
 const test = require('node:test');
 const assert = require('node:assert');
-const { buildGraph, nodeRadius, hitTest, WINDOW_DAYS } = require('../karenda-/lib/graph-model.js');
+const { buildGraph, nodeRadius, hitTest, WINDOW_DAYS, TODAY_RADIUS } = require('../karenda-/lib/graph-model.js');
 
 const CATS = [
   { id: 'c1', name: '仕事', color: '#4772b3' },
@@ -227,12 +227,21 @@ test('a category with no events at all is left out', () => {
 
 // ── edges, degree, radius ────────────────────────────────────────────────────
 
-test('there are exactly three kinds of edge and no day-to-day chain', () => {
+test('day-to-day edges form a star centred on today, never a chain', () => {
+  // This replaces an earlier assertion that there were no day-to-day edges at
+  // all. Today now links to each other day so the week can settle into rings
+  // around it, but the original intent still holds: consecutive days must not
+  // be strung together (17-18-19-20), because a chain lets the far end of the
+  // week wander off on its own thread instead of standing at a distance that
+  // means "six days away".
   const g = build({
+    today: START,
     events: { [IN]: [{ _dbId: 12, catId: 'c1', title: 'A' }], [k(19)]: [{ _dbId: 13, catId: 'c1', title: 'B' }] },
   });
   const dayToDay = g.edges.filter(e => e.source.startsWith('date:') && e.target.startsWith('date:'));
-  assert.deepStrictEqual(dayToDay, [], 'consecutive days must not be chained');
+  const offCentre = dayToDay.filter(e => e.source !== 'date:' + START && e.target !== 'date:' + START);
+  assert.deepStrictEqual(offCentre, [],
+    `every day-to-day edge must touch today; these do not: ${JSON.stringify(offCentre)}`);
 });
 
 test('degree counts both ends and drives the radius', () => {
@@ -333,6 +342,88 @@ test('a today outside the window on screen weights nothing', () => {
   });
   const heavy = g.edges.filter(e => e.weight !== 1);
   assert.deepStrictEqual(heavy, [], `a day outside the window must not pull: ${JSON.stringify(heavy)}`);
+});
+
+// ── the other days, ringed by how near they are ──────────────────────────────
+// "その日に関係すること次第で近くして" — relatedness is nearness in time, so
+// today links out to each other day with a weight that falls as the gap grows.
+// A smaller weight is a longer rest length (linkDistance / weight), so the week
+// settles into rings: tomorrow innermost, the sixth day out at the rim.
+
+test('today links to every other day in the window exactly once, and never to itself', () => {
+  const g = build({ today: START });
+  const dayToDay = g.edges.filter(e => e.source.startsWith('date:') && e.target.startsWith('date:'));
+  assert.strictEqual(dayToDay.length, 6,
+    `a 7-day window has six other days; got ${dayToDay.length} day-to-day edges`);
+  const others = dayToDay.map(e => (e.source === 'date:' + START ? e.target : e.source)).sort();
+  assert.deepStrictEqual(others,
+    [k(18), k(19), k(20), k(21), k(22), k(23)].map(d => 'date:' + d).sort(),
+    `each of the other six days must be linked once; got [${others.join(', ')}]`);
+  const selfLoop = g.edges.filter(e => e.source === e.target);
+  assert.deepStrictEqual(selfLoop, [], `today must not be linked to itself: ${JSON.stringify(selfLoop)}`);
+});
+
+test('the day six days out is held on a much weaker spring than tomorrow', () => {
+  // The one comparison the whole feature rests on: a bigger gap must mean a
+  // smaller weight, which the force layer reads as a longer rest length.
+  const g = build({ today: START });
+  const near = edge(g, 'date:' + START, 'date:' + k(18)).weight;
+  const far = edge(g, 'date:' + START, 'date:' + k(23)).weight;
+  assert.ok(far < near,
+    `a gap of six days must weigh less than a gap of one: gap 1 is ${near}, gap 6 is ${far}`);
+  assert.ok(near / far > 2,
+    `the rim should sit well outside the first ring: gap 1 is ${near}, gap 6 is ${far}, ratio ${near / far}`);
+});
+
+test('the day-to-day weight falls at every step out from today', () => {
+  const g = build({ today: START });
+  const weights = [18, 19, 20, 21, 22, 23].map(d => edge(g, 'date:' + START, 'date:' + k(d)).weight);
+  for (let i = 1; i < weights.length; i++) {
+    assert.ok(weights[i] < weights[i - 1],
+      `day ${17 + i + 1} must be held further out than day ${17 + i}; weights are [${weights.join(', ')}]`);
+  }
+});
+
+test("no other day is drawn in closer than today's own events", () => {
+  // Tomorrow must sit outside today's cluster. If it came in nearer, the
+  // picture would say tomorrow matters more than what today actually holds.
+  const g = build({ today: START, events: { [START]: [{ _dbId: 41, catId: 'c1', title: '今日' }] } });
+  const cluster = edge(g, 'event:41', 'date:' + START).weight;
+  const tomorrow = edge(g, 'date:' + START, 'date:' + k(18)).weight;
+  assert.ok(tomorrow < cluster,
+    `today's own events must be the innermost ring: event weight ${cluster}, tomorrow ${tomorrow}`);
+});
+
+test('with no today given, no two days are linked at all', () => {
+  // The same clock-independence guard the weights and the pin have: a model
+  // that read new Date() would build a star here and fail this test.
+  const g = build({});
+  const dayToDay = g.edges.filter(e => e.source.startsWith('date:') && e.target.startsWith('date:'));
+  assert.deepStrictEqual(dayToDay, [],
+    `omitting today must link no days; got ${JSON.stringify(dayToDay)}`);
+});
+
+test('a today outside the window on screen links no days together', () => {
+  const g = build({ today: '2026-08-17' });
+  const dayToDay = g.edges.filter(e => e.source.startsWith('date:') && e.target.startsWith('date:'));
+  assert.deepStrictEqual(dayToDay, [],
+    `a day outside the window is not a centre; got ${JSON.stringify(dayToDay)}`);
+});
+
+test("today's day node is drawn larger than any radius a degree could earn", () => {
+  const g = build({
+    today: START,
+    events: { [START]: [{ _dbId: 42, catId: 'c1', title: 'A' }], [IN]: [{ _dbId: 43, catId: 'c1', title: 'B' }] },
+    tasks: [{ id: 't40', title: 'X', dueDate: START, done: false }],
+  });
+  const todayNode = g.nodes.find(n => n.id === 'date:' + START);
+  const biggestOther = Math.max(...g.nodes.filter(n => n !== todayNode).map(n => n.r));
+  assert.strictEqual(todayNode.r, TODAY_RADIUS,
+    `today must take the fixed radius, got ${todayNode.r}`);
+  assert.ok(todayNode.r > biggestOther,
+    `today must be the largest node; today ${todayNode.r}, largest other ${biggestOther}`);
+  assert.ok(TODAY_RADIUS > nodeRadius(1000),
+    `the fixed radius must clear the degree clamp; ${TODAY_RADIUS} vs ${nodeRadius(1000)}`);
 });
 
 // ── today at the centre ──────────────────────────────────────────────────────

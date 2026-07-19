@@ -3968,7 +3968,8 @@ body.is-phone .status-bar { display: none; }
   gap: 6px;
 }
 .task-edit-date,
-.task-edit-priority {
+.task-edit-priority,
+.task-edit-project {
   flex: 1;
   font-size: 12px;
   padding: 4px 6px;
@@ -3979,6 +3980,7 @@ body.is-phone .status-bar { display: none; }
   outline: none;
 }
 .task-edit-priority { flex: 0 0 60px; }
+.task-edit-project { flex: 0 0 100px; }
 
 .task-edit-actions {
   display: flex;

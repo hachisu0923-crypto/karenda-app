@@ -4497,11 +4497,11 @@ function renderProjectSettings() {
     return;
   }
   listEl.innerHTML = projects.map(p => `
-    <div class="setting-item" data-project-id="${escAttr(p.id)}"${p.archived ? ' style="opacity:.5"' : ''}>
+    <div class="setting-item" data-project-id="${escapeHtml(p.id)}"${p.archived ? ' style="opacity:.5"' : ''}>
       <div class="setting-item-info">
         <div class="setting-item-name">
-          <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${escAttr(p.color)};margin-right:6px"></span>
-          ${escHtmlLocal(p.name)}
+          <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${escapeHtml(p.color)};margin-right:6px"></span>
+          ${escapeHtml(p.name)}
         </div>
       </div>
       <div class="setting-item-control">
@@ -4519,7 +4519,7 @@ function renderProjectSelects() {
     const keep = formSel.value;
     formSel.innerHTML = '<option value="">未分類</option>'
       + activeProjects().map(p =>
-          `<option value="${escAttr(p.id)}">${escHtmlLocal(p.name)}</option>`).join('');
+          `<option value="${escapeHtml(p.id)}">${escapeHtml(p.name)}</option>`).join('');
     formSel.value = keep;                       // 選択が消えていたら '' に戻る
   }
   const filterSel = document.getElementById('js-task-project-filter');
@@ -4528,21 +4528,9 @@ function renderProjectSelects() {
     filterSel.innerHTML = '<option value="all">全プロジェクト</option>'
       + '<option value="none">未分類</option>'
       + projects.map(p =>
-          `<option value="${escAttr(p.id)}">${escHtmlLocal(p.name)}${p.archived ? '（済）' : ''}</option>`).join('');
+          `<option value="${escapeHtml(p.id)}">${escapeHtml(p.name)}${p.archived ? '（済）' : ''}</option>`).join('');
     filterSel.value = keep || 'all';
-    if (!filterSel.value) filterSel.value = 'all';
   }
-}
-
-// 属性値に入れる文字列のエスケープ。lib/md-inline.js の escHtml は本文向けで
-// ここには読み込まれていないので、この2つはローカルに持つ。
-function escAttr(s) {
-  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;')
-    .replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-function escHtmlLocal(s) {
-  return String(s == null ? '' : s).replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 function initProjectSettings() {
@@ -4670,9 +4658,10 @@ async function initTaskPanel(user) {
       const newTitle = row.querySelector('.task-edit-title')?.value.trim();
       if (!newTitle) { row.querySelector('.task-edit-title')?.focus(); return; }
       const oldDueDate = t.dueDate;
-      t.title    = newTitle;
-      t.dueDate  = row.querySelector('.task-edit-date')?.value || '';
-      t.priority = row.querySelector('.task-edit-priority')?.value || 'medium';
+      t.title     = newTitle;
+      t.dueDate   = row.querySelector('.task-edit-date')?.value || '';
+      t.priority  = row.querySelector('.task-edit-priority')?.value || 'medium';
+      t.projectId = row.querySelector('.task-edit-project')?.value || '';
       _persistTasks();
       renderTaskPanel();
       if (oldDueDate || t.dueDate) renderMain();
@@ -4796,7 +4785,7 @@ function renderTaskPanel() {
           <div class="task-meta">
             ${dueMeta}
             ${t.projectId && projectById(t.projectId)
-              ? `<span class="task-project" style="color:${escAttr(projectById(t.projectId).color)}">${escHtmlLocal(projectById(t.projectId).name)}</span>`
+              ? `<span class="task-project" style="color:${escapeHtml(projectById(t.projectId).color)}">${escapeHtml(projectById(t.projectId).name)}</span>`
               : ''}
             <span class="task-priority-label ${pClass}">${pLabel}</span>
           </div>
@@ -4813,12 +4802,24 @@ function _openTaskEditForm(row, task) {
   const pOpts = ['high','medium','low'].map(v =>
     `<option value="${v}" ${(task.priority||'medium')===v?'selected':''}>${v==='high'?'高':v==='low'?'低':'中'}</option>`
   ).join('');
+  // プロジェクト選択肢は追加フォームと同じ規則: 先頭に未分類、続けて未アーカイブの
+  // プロジェクト。ただしこのタスクが既にアーカイブ済みプロジェクトに属している場合、
+  // 選択肢から消して割り当てを勝手に外さないよう、現在の割り当てを（済）付きで残す。
+  const currentProjectId = task.projectId || '';
+  const currentProject = projectById(task.projectId);
+  let projOpts = `<option value="" ${currentProjectId===''?'selected':''}>未分類</option>`
+    + activeProjects().map(p =>
+        `<option value="${escapeHtml(p.id)}" ${p.id===currentProjectId?'selected':''}>${escapeHtml(p.name)}</option>`).join('');
+  if (currentProjectId && currentProject && currentProject.archived) {
+    projOpts += `<option value="${escapeHtml(currentProject.id)}" selected>${escapeHtml(currentProject.name)}（済）</option>`;
+  }
   row.innerHTML =
     `<div class="task-edit-form">` +
     `<input class="task-edit-title" type="text" value="${escapeHtml(task.title)}" placeholder="タスク名" maxlength="100">` +
     `<div class="task-edit-row">` +
     `<input class="task-edit-date" type="date" value="${task.dueDate||''}">` +
     `<select class="task-edit-priority">${pOpts}</select>` +
+    `<select class="task-edit-project">${projOpts}</select>` +
     `</div>` +
     `<div class="task-edit-actions">` +
     `<button class="task-edit-save" type="button">保存</button>` +
@@ -6060,7 +6061,7 @@ document.getElementById('js-daily-plan-save').addEventListener('click', async ()
 
   for (const spec of newTasks) {
     const id = `t_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-    const task = { id, title: spec.title, dueDate, priority: spec.priority, done: false, createdAt: Date.now() };
+    const task = { id, title: spec.title, dueDate, priority: spec.priority, projectId: '', done: false, createdAt: Date.now() };
     _taskState.tasks.unshift(task);
     _persistTasks();
     await addTaskToSupabase(task);
@@ -6174,7 +6175,7 @@ async function vaultExport() {
       const pd = await vaultFs.dir(base, 'projects', true);
       let pn = 0;
       for (const p of projects) {
-        const fname = mdNote.safeFileName(p.name || p.id) + '.md';
+        const fname = (mdNote.safeFileName(p.name || p.id) || p.id) + '.md';
         await vaultFs.writeFile(pd, fname, mdNote.projectToNote(p));
         pn++;
       }

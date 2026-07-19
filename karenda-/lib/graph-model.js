@@ -29,9 +29,17 @@
 
   // How much harder today's day node holds onto its own events and tasks.
   // The force layer reads a link's weight as "shorter and stiffer" — rest
-  // length is linkDistance / weight, so 3 gathers today's cluster to ~83px
-  // while every other day stays at the usual 250.
-  var TODAY_LINK_WEIGHT = 3;
+  // length is linkDistance / weight, so 4 gathers today's cluster to ~63px
+  // (it settles at 73-80px once its own items repel each other) while every
+  // other day stays at the usual 250.
+  //
+  // This has to stay above DAY_CHILD_WEIGHT below, or another day would hold
+  // its events more tightly than today holds its own — the inversion the two
+  // "linked to its day more heavily" tests catch. It is also what makes the
+  // rest of the picture compact: today's cluster radius is what the first ring
+  // has to clear, so pulling today in from ~110px to ~78px is what let
+  // NEAR_DAY_RING come down from 240 to 190.
+  var TODAY_LINK_WEIGHT = 4;
 
   // The graph shows this many days, starting at today. Seven is the user's ask
   // ("その日から7日以内"): today plus the six days after it, not today + 7.
@@ -78,23 +86,31 @@
   // it as they crowd (a day with 8 events, 8 notes and 4 tasks settles at ~100px
   // rather than 83). An event of today's sitting at radius rc, on the same
   // bearing as tomorrow, is nearer tomorrow than today the moment rc > R1 - rc.
-  // So the first ring must clear twice the inflated inner ring: 240 leaves room
-  // for an inner ring up to ~117px, which is a today of roughly two dozen items.
-  // This is why the picture is made compact from the outside in: the first ring
-  // is held by that inequality and cannot come in, so the room to tighten is in
-  // the outermost ring and in DAY_CHILD_GAP below.
-  var NEAR_DAY_RING = 240;   // a gap of one day
-  var FAR_DAY_RING = 410;    // the widest gap the window holds
+  // The "twice the inner ring" rule of thumb is only a rule of thumb; the real
+  // limit was measured by walking NEAR_DAY_RING down and watching the margin by
+  // which each event beats the next day to its own day. With today's cluster
+  // pulled in to ~78px (TODAY_LINK_WEIGHT above) that margin goes negative at
+  // 145, so 190 sits 45px clear of a measured break rather than of a guess.
+  //
+  // The lesson from the measurement: the first ring is not held by its own
+  // value but by how fat today's cluster is. Tightening today buys ring room
+  // at a better rate than shrinking the rings does.
+  var NEAR_DAY_RING = 190;   // a gap of one day
+  var FAR_DAY_RING = 290;    // the widest gap the window holds
 
   // How far beyond its own day a day's events and tasks sit, and how wide a
   // sector they fan across (radians either side of the day's own direction).
-  // The gap has to clear the day-to-day ring spacing ((410-240)/5 = 34px) by
+  // The gap has to clear the day-to-day ring spacing ((290-190)/5 = 20px) by
   // enough that a cluster reads as belonging to its day rather than to the next
   // ring out; the sector has to stay well inside the 60° each day owns. Rings
   // are 60° apart, so a cluster is never on the same bearing as another ring —
-  // measured, the nearest day node to any event is always its own, by 34px at
+  // measured, the nearest day node to any event is always its own, by 35px at
   // the thinnest (a today holding 8 events, 8 notes and 4 tasks).
-  var DAY_CHILD_GAP = 100;
+  //
+  // Shrinking this does not shrink today's cluster, which hangs off
+  // TODAY_LINK_WEIGHT instead: it only pulls the other days' events in, so it
+  // buys compaction at the rim without costing headroom at the centre.
+  var DAY_CHILD_GAP = 70;
   var DAY_CHILD_SPREAD = 0.35;                          // ~20°
   var DAY_CHILD_WEIGHT = LINK_DISTANCE / DAY_CHILD_GAP;
 

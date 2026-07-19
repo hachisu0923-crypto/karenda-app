@@ -484,14 +484,21 @@ test('a today outside the window on screen pins nothing', () => {
 // notes across the window. The target (before any '|') is the node; an alias is
 // only display text. See buildGraph's event loop.
 
-test("a [[note]] in today's event title becomes a note node linked with weight 3", () => {
+test("a [[note]] in today's event title becomes a note node held as tightly as today's own cluster", () => {
   const g = build({ today: START, events: { [START]: [{ _dbId: 30, catId: 'c1', title: '打合せ [[案件A]]' }] } });
   const note = g.nodes.find(n => n.id === 'note:案件A');
   assert.ok(note, 'the note the title mentions must become a node');
   assert.strictEqual(note.kind, 'note', `a note node must be kind "note", got ${note && note.kind}`);
   assert.strictEqual(note.label, '案件A', `the label is the note name, got ${note && note.label}`);
+  // The property, not the number: a note hangs off today's event on the same
+  // spring that holds the event to today, so the note joins today's cluster
+  // instead of drifting out to the default 250px. The weight itself moves when
+  // the picture is made more or less compact.
   const w = edge(g, 'event:30', 'note:案件A').weight;
-  assert.strictEqual(w, 3, `the event->note edge must carry the today weight 3, got ${w}`);
+  const dayW = edge(g, 'event:30', 'date:' + START).weight;
+  assert.strictEqual(w, dayW,
+    `the event->note edge must carry the same today weight as the event->day edge, got ${w} vs ${dayW}`);
+  assert.ok(w > 1, `a note must be gathered, not left on the default spring, got ${w}`);
 });
 
 test("a note node carries no colour, so the view themes it like a task", () => {

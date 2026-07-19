@@ -110,6 +110,7 @@ let events         = {};          // { dateKey: [ eventObj, … ] }
 let projects       = [];   // [{id, _dbId, name, color, archived, createdAt}] 作業テーマ
 let _projectSettingsInited = false;
 let _taskProjectFilterInited = false;
+let _taskPanelListenersInited = false;
 let overtimeCashouts = [];        // [{ id, catId, minutes, note, dateKey, createdAt }]
 let dailyDrinks      = {};        // { dateKey: count }
 let curDate        = new Date();
@@ -4608,92 +4609,96 @@ async function initTaskPanel(user) {
   renderMain(); // タスクの期限をカレンダーに反映
   initGoalPanel(userId);
 
-  // Add task
-  formEl.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    if (!_taskState) return;
-    const title = (inputEl.value || '').trim();
-    if (!title) return;
-    const id = `t_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-    const dueDate  = dateEl?.value || '';
-    const priority = priorityEl?.value || 'medium';
-    const projectId = _taskState.els.projectEl?.value || '';
-    const task = { id, title, dueDate, priority, projectId, done: false, createdAt: Date.now() };
-    _taskState.tasks.unshift(task);
-    inputEl.value = '';
-    if (dateEl) dateEl.value = '';
-    if (priorityEl) priorityEl.value = 'medium';
-    _persistTasks();
-    renderTaskPanel();
-    if (dueDate) renderMain(); // 期限ありの場合のみカレンダー再描画
-    await addTaskToSupabase(task);
-  });
+  if (!_taskPanelListenersInited) {
+    _taskPanelListenersInited = true;
 
-  // Toggle / Delete
-  listEl.addEventListener('click', async (e) => {
-    if (!_taskState) return;
-    const row = e.target.closest?.('[data-task-id]');
-    if (!row) return;
-    const id = row.getAttribute('data-task-id');
-    if (e.target.closest?.('.task-del')) {
-      const removed = _taskState.tasks.find(t => t.id === id);
-      _taskState.tasks = _taskState.tasks.filter(t => t.id !== id);
-      _persistTasks();
-      renderTaskPanel();
-      if (removed?.dueDate) renderMain();
-      await deleteTaskFromSupabase(id);
-      return;
-    }
-    // 編集ボタン → インライン編集フォームを開く
-    if (e.target.closest?.('.task-edit-btn')) {
-      const t = _taskState.tasks.find(t => t.id === id);
-      if (!t) return;
-      _openTaskEditForm(row, t);
-      return;
-    }
-    // 保存ボタン
-    if (e.target.closest?.('.task-edit-save')) {
-      const t = _taskState.tasks.find(t => t.id === id);
-      if (!t) return;
-      const newTitle = row.querySelector('.task-edit-title')?.value.trim();
-      if (!newTitle) { row.querySelector('.task-edit-title')?.focus(); return; }
-      const oldDueDate = t.dueDate;
-      t.title     = newTitle;
-      t.dueDate   = row.querySelector('.task-edit-date')?.value || '';
-      t.priority  = row.querySelector('.task-edit-priority')?.value || 'medium';
-      t.projectId = row.querySelector('.task-edit-project')?.value || '';
-      _persistTasks();
-      renderTaskPanel();
-      if (oldDueDate || t.dueDate) renderMain();
-      await updateTaskInSupabase(t);
-      return;
-    }
-    // キャンセルボタン
-    if (e.target.closest?.('.task-edit-cancel')) {
-      renderTaskPanel();
-      return;
-    }
-    const t = _taskState.tasks.find(t => t.id === id);
-    if (!t) return;
-    // 編集中の行はチェック操作を無視
-    if (row.classList.contains('is-editing')) return;
-    t.done = !t.done;
-    _persistTasks();
-    renderTaskPanel();
-    if (t.dueDate) renderMain(); // 期限ありのタスクのみカレンダー再描画
-    await updateTaskInSupabase(t);
-  });
-
-  // Filter buttons
-  document.querySelectorAll('.task-filter').forEach(btn => {
-    btn.addEventListener('click', () => {
+    // Add task
+    formEl.addEventListener('submit', async (e) => {
+      e.preventDefault();
       if (!_taskState) return;
-      _taskState.filter = btn.dataset.filter;
-      document.querySelectorAll('.task-filter').forEach(b =>
-        b.classList.toggle('is-active', b === btn));
+      const title = (inputEl.value || '').trim();
+      if (!title) return;
+      const id = `t_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+      const dueDate  = dateEl?.value || '';
+      const priority = priorityEl?.value || 'medium';
+      const projectId = _taskState.els.projectEl?.value || '';
+      const task = { id, title, dueDate, priority, projectId, done: false, createdAt: Date.now() };
+      _taskState.tasks.unshift(task);
+      inputEl.value = '';
+      if (dateEl) dateEl.value = '';
+      if (priorityEl) priorityEl.value = 'medium';
+      _persistTasks();
       renderTaskPanel();
+      if (dueDate) renderMain(); // 期限ありの場合のみカレンダー再描画
+      await addTaskToSupabase(task);
     });
-  });
+
+    // Toggle / Delete
+    listEl.addEventListener('click', async (e) => {
+      if (!_taskState) return;
+      const row = e.target.closest?.('[data-task-id]');
+      if (!row) return;
+      const id = row.getAttribute('data-task-id');
+      if (e.target.closest?.('.task-del')) {
+        const removed = _taskState.tasks.find(t => t.id === id);
+        _taskState.tasks = _taskState.tasks.filter(t => t.id !== id);
+        _persistTasks();
+        renderTaskPanel();
+        if (removed?.dueDate) renderMain();
+        await deleteTaskFromSupabase(id);
+        return;
+      }
+      // 編集ボタン → インライン編集フォームを開く
+      if (e.target.closest?.('.task-edit-btn')) {
+        const t = _taskState.tasks.find(t => t.id === id);
+        if (!t) return;
+        _openTaskEditForm(row, t);
+        return;
+      }
+      // 保存ボタン
+      if (e.target.closest?.('.task-edit-save')) {
+        const t = _taskState.tasks.find(t => t.id === id);
+        if (!t) return;
+        const newTitle = row.querySelector('.task-edit-title')?.value.trim();
+        if (!newTitle) { row.querySelector('.task-edit-title')?.focus(); return; }
+        const oldDueDate = t.dueDate;
+        t.title     = newTitle;
+        t.dueDate   = row.querySelector('.task-edit-date')?.value || '';
+        t.priority  = row.querySelector('.task-edit-priority')?.value || 'medium';
+        t.projectId = row.querySelector('.task-edit-project')?.value || '';
+        _persistTasks();
+        renderTaskPanel();
+        if (oldDueDate || t.dueDate) renderMain();
+        await updateTaskInSupabase(t);
+        return;
+      }
+      // キャンセルボタン
+      if (e.target.closest?.('.task-edit-cancel')) {
+        renderTaskPanel();
+        return;
+      }
+      const t = _taskState.tasks.find(t => t.id === id);
+      if (!t) return;
+      // 編集中の行はチェック操作を無視
+      if (row.classList.contains('is-editing')) return;
+      t.done = !t.done;
+      _persistTasks();
+      renderTaskPanel();
+      if (t.dueDate) renderMain(); // 期限ありのタスクのみカレンダー再描画
+      await updateTaskInSupabase(t);
+    });
+
+    // Filter buttons
+    document.querySelectorAll('.task-filter').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (!_taskState) return;
+        _taskState.filter = btn.dataset.filter;
+        document.querySelectorAll('.task-filter').forEach(b =>
+          b.classList.toggle('is-active', b === btn));
+        renderTaskPanel();
+      });
+    });
+  }
 
   // プロジェクト絞り込み
   const pfEl = document.getElementById('js-task-project-filter');

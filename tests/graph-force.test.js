@@ -427,13 +427,16 @@ test("the week settles into rings: a day further from today lands further out", 
   // monotonically, because repulsion and centering also move a node — so this
   // measures the geometry the eye gets, through the real model weights.
   //
-  // The week is bare on purpose. A day's own events hang off it on stiffer
-  // springs (weight 1) than the slack tether that holds a far day to today
-  // (weight 0.625 at the rim), so a loaded outermost day gets dragged inward by
-  // its own contents: measured, a week whose only load sits on the sixth day
-  // out puts that day at 275px, inside the fifth day's 304px. That is a real
-  // limit of the design, recorded here rather than asserted away; this test
-  // pins the ring structure itself, which is what the weights control.
+  // The week is bare on purpose: this test pins the ring structure itself.
+  //
+  // A loaded week used to break it. A day's own events hung off it on stiffer
+  // springs (weight 1) than the slack tether holding a far day to today
+  // (weight 0.625 at the rim), so an outermost day carrying all the load was
+  // dragged inward by its own contents — measured, to 275px, inside the fifth
+  // day's 304px. Anchors ended that: the model now names the ring each day
+  // belongs on, and a day's events are held at the gap their own anchors ask
+  // for instead of pulling against the tether. The loaded case is asserted
+  // directly by the test below this one.
   const start = '2026-07-19';
   const graph = require('../karenda-/lib/graph-model.js')
     .buildGraph({ start: start, days: 7, today: start });
@@ -452,4 +455,233 @@ test("the week settles into rings: a day further from today lands further out", 
   // And the nearest ring clears today's own cluster (~83px, TODAY_LINK_WEIGHT).
   assert.ok(rings[0] > 100,
     `tomorrow must settle outside today's own cluster, got ${rings[0].toFixed(1)}px`);
+});
+
+// ── anchors: the arrangement the model asked for, measured after settling ─────
+// "その日を中心して、それ以外の日を離して、予定をそのリンクとつながっているは
+// それぞれの日から外側に繋がるようにして" — three claims about the settled
+// picture, so they are measured on settled coordinates through the real chain
+// (buildGraph -> createSim -> settle), never on the anchors the model wrote.
+
+const model = require('../karenda-/lib/graph-model.js');
+
+// A week with two or three events and a task on every single day, which is what
+// an ordinary calendar looks like. `pile` overloads one day instead; `crowd`
+// fills today itself, which inflates today's ring against the first day ring.
+function week(opts) {
+  const o = opts || {};
+  const today = '2026-07-17';
+  const day = i => `2026-07-${String(17 + i).padStart(2, '0')}`;
+  const cats = [
+    { id: 'c1', name: '仕事', color: '#4772b3' },
+    { id: 'c2', name: '暮らし', color: '#e9973f' },
+    { id: 'c3', name: '勉強', color: '#4fa66a' },
+  ];
+  const events = {}, tasks = [];
+  let id = 0;
+  for (let i = 0; i < 7; i++) {
+    const n = o.pile === i ? 9 : (o.crowd && i === 0 ? 8 : 2 + (i % 2));
+    events[day(i)] = [];
+    for (let j = 0; j < n; j++) {
+      // Under `crowd` each of today's events also names a note, so today's ring
+      // carries twice as many nodes again.
+      const title = o.crowd && i === 0 ? `予定${i}-${j} [[ノート${j}]]` : `予定${i}-${j}`;
+      events[day(i)].push({ _dbId: ++id, catId: cats[(i + j) % 3].id, title });
+    }
+    tasks.push({ id: `t${i}`, title: `課題${i}`, dueDate: day(i), done: false });
+    if (o.crowd && i === 0) {
+      for (let j = 1; j < 4; j++) tasks.push({ id: `tc${j}`, title: `今日の課題${j}`, dueDate: day(0), done: false });
+    }
+  }
+  const graph = model.buildGraph({ start: today, days: 7, events, categories: cats, tasks, today });
+  const sim = F.createSim(graph);
+  F.settle(sim);
+  return { today, graph, sim, nodes: sim.nodes };
+}
+
+const radius = n => Math.hypot(n.x, n.y);
+const dayNodes = nodes => nodes.filter(n => n.kind === 'date');
+const hangers = nodes => nodes.filter(n => n.kind === 'event' || n.kind === 'task');
+
+test('every event and task settles further from the centre than its own day', () => {
+  // The user's "予定をそれぞれの日から外側に繋がるように": a day's contents read
+  // as radiating away from today, never doubling back inside the ring.
+  const w = week();
+  const byKey = new Map(dayNodes(w.nodes).map(d => [d.key, d]));
+  const outer = hangers(w.nodes).filter(n => n.key !== w.today);
+  const inside = outer.filter(n => !(radius(n) > radius(byKey.get(n.key))));
+  assert.deepStrictEqual(
+    inside.map(n => `${n.id} r=${radius(n).toFixed(1)} vs day r=${radius(byKey.get(n.key)).toFixed(1)}`), [],
+    `all ${outer.length} of the other days' events and tasks must settle outside their own day`);
+});
+
+test('a day piled high still keeps its events outside itself', () => {
+  // The lopsided case: one day carrying nine events plus a task, which is what
+  // dragged a loaded day out of position before anchors existed.
+  const w = week({ pile: 5 });
+  const byKey = new Map(dayNodes(w.nodes).map(d => [d.key, d]));
+  const outer = hangers(w.nodes).filter(n => n.key !== w.today);
+  const inside = outer.filter(n => !(radius(n) > radius(byKey.get(n.key))));
+  assert.deepStrictEqual(inside.map(n => `${n.id} r=${radius(n).toFixed(1)}`), [],
+    `a pile must still sit outside its day; ${outer.length} nodes measured`);
+});
+
+test('every event and task settles nearer its own day than any other day', () => {
+  // Clusters that do not mix — the other half of the picture. Radial order
+  // alone would allow a day's events to drift sideways into the next day's
+  // sector, which reads as the wrong day owning them.
+  const w = week();
+  const days = dayNodes(w.nodes);
+  const byKey = new Map(days.map(d => [d.key, d]));
+  const strays = [];
+  hangers(w.nodes).forEach(n => {
+    const own = dist(n, byKey.get(n.key));
+    days.forEach(d => {
+      if (d.key !== n.key && dist(n, d) <= own) {
+        strays.push(`${n.id} (${n.key}) is ${dist(n, d).toFixed(1)}px from ${d.key} but ${own.toFixed(1)}px from its own day`);
+      }
+    });
+  });
+  assert.deepStrictEqual(strays, [], 'no event or task may settle nearer another day than its own');
+});
+
+test("a crowded today does not push its own events into tomorrow's cluster", () => {
+  // The margin that actually broke in practice. Today's ring holds however much
+  // today has, and repulsion inflates it — measured, 8 events plus 8 notes plus
+  // 4 tasks push it from 83px to ~100px. With the first day ring at 200 one of
+  // today's events settled 98px from tomorrow but 100px from today, so tomorrow
+  // owned it. The ring spacing has to clear twice the inflated inner ring.
+  const w = week({ crowd: true });
+  const days = dayNodes(w.nodes);
+  const byKey = new Map(days.map(d => [d.key, d]));
+  const strays = [];
+  hangers(w.nodes).forEach(n => {
+    const own = dist(n, byKey.get(n.key));
+    days.forEach(d => {
+      if (d.key !== n.key && dist(n, d) <= own) {
+        strays.push(`${n.id} (${n.key}) is ${dist(n, d).toFixed(1)}px from ${d.key} but ${own.toFixed(1)}px from its own day`);
+      }
+    });
+  });
+  assert.deepStrictEqual(strays, [], "a full today must keep its own events nearest to today");
+});
+
+test('a day piled high does not spill into the clusters beside it', () => {
+  const w = week({ pile: 1 });
+  const days = dayNodes(w.nodes);
+  const byKey = new Map(days.map(d => [d.key, d]));
+  const strays = [];
+  hangers(w.nodes).forEach(n => {
+    const own = dist(n, byKey.get(n.key));
+    days.forEach(d => {
+      if (d.key !== n.key && dist(n, d) <= own) strays.push(`${n.id} (${n.key}) -> ${d.key}`);
+    });
+  });
+  assert.deepStrictEqual(strays, [], 'a piled-up day must keep its own events nearest to itself');
+});
+
+test('a loaded week still lands its days in date order, further out each step', () => {
+  // The case the bare-week test above cannot reach: the ring order has to
+  // survive every day carrying its own weight.
+  const w = week();
+  const today = w.nodes.find(n => n.pinned);
+  const rings = dayNodes(w.nodes).filter(n => !n.pinned)
+    .sort((a, b) => a.key.localeCompare(b.key))
+    .map(n => Math.hypot(n.x - today.x, n.y - today.y));
+  for (let i = 1; i < rings.length; i++) {
+    assert.ok(rings[i] > rings[i - 1],
+      `day ${i + 1} out must settle further than day ${i}; rings are [${rings.map(r => r.toFixed(1)).join(', ')}]`);
+  }
+});
+
+test('the days settle far enough apart that their clusters read as separate', () => {
+  const w = week();
+  const days = dayNodes(w.nodes);
+  let min = Infinity, pair = '';
+  for (let i = 0; i < days.length; i++) {
+    for (let j = i + 1; j < days.length; j++) {
+      const d = dist(days[i], days[j]);
+      if (d < min) { min = d; pair = `${days[i].key} and ${days[j].key}`; }
+    }
+  }
+  assert.ok(min > 150,
+    `the closest two days (${pair}) settled ${min.toFixed(1)}px apart, too close to read as separate`);
+});
+
+test('the whole week fits on a 1200x800 screen with today dead centre', () => {
+  const w = week();
+  const today = w.nodes.find(n => n.pinned);
+  const cam = F.fitToView(w.nodes, 1200, 800, undefined, { x: today.x, y: today.y });
+  const centre = F.worldToScreen(cam, today.x, today.y);
+  assert.ok(Math.hypot(centre.x - 600, centre.y - 400) < 1e-9,
+    `today must land on the centre of the screen, got (${centre.x}, ${centre.y})`);
+  const off = w.nodes.filter(n => {
+    const s = F.worldToScreen(cam, n.x, n.y);
+    return !(s.x > 0 && s.x < 1200 && s.y > 0 && s.y < 800);
+  });
+  assert.deepStrictEqual(off.map(n => n.id), [],
+    `every node must be on screen; ${w.nodes.length} nodes measured`);
+  assert.ok(w.nodes.every(n => Number.isFinite(n.x) && Number.isFinite(n.y)),
+    'every settled coordinate must be finite');
+});
+
+// ── what an anchor means to the physics ──────────────────────────────────────
+
+test('an anchored node is pulled to its anchor, a touch inside it', () => {
+  // It lands just short, and by a knowable amount: centering pulls toward the
+  // origin at centerStrength * 0.1 = 0.01 while the anchor pulls out at
+  // anchorStrength = 0.35, so a lone node balances at 0.35/0.36 = 97.22% of the
+  // way out. Measured, not assumed — an anchor is a target, not a decree, and
+  // every ring radius the model names arrives about 3% short for this reason.
+  const anchor = { x: 300, y: -120 };
+  const sim = F.createSim({ nodes: [{ id: 'a', anchor: anchor }], edges: [] });
+  sim.nodes[0].x = 0; sim.nodes[0].y = 0;         // start it away from home
+  F.settle(sim);
+  const fraction = Math.hypot(sim.nodes[0].x, sim.nodes[0].y) / Math.hypot(anchor.x, anchor.y);
+  assert.ok(Math.abs(fraction - 0.9722) < 0.001,
+    `a lone anchored node must balance at 97.22% of its anchor, got ${(fraction * 100).toFixed(2)}% ` +
+    `at (${sim.nodes[0].x.toFixed(1)}, ${sim.nodes[0].y.toFixed(1)})`);
+  assert.ok(dist(sim.nodes[0], anchor) < 10,
+    `and that is within 10px of the anchor itself, got ${dist(sim.nodes[0], anchor).toFixed(1)}px`);
+});
+
+test('initLayout seeds an anchored node at its anchor rather than on the spiral', () => {
+  // Not tidiness: from the spiral, 400 ticks of a decaying alpha does not always
+  // cover 500px, so the first paint would show a half-arrived layout.
+  const sim = F.createSim({ nodes: [{ id: 'a' }, { id: 'b', anchor: { x: 500, y: 400 } }], edges: [] });
+  assert.strictEqual(sim.nodes[1].x, 500);
+  assert.strictEqual(sim.nodes[1].y, 400);
+});
+
+test('pinned still beats an anchor, so today cannot be pulled off the origin', () => {
+  const sim = F.createSim({ nodes: [{ id: 'a', pinned: true, anchor: { x: 400, y: 400 } }], edges: [] });
+  F.settle(sim);
+  assert.strictEqual(sim.nodes[0].x, 0);
+  assert.strictEqual(sim.nodes[0].y, 0);
+});
+
+test('a drag beats an anchor while the pointer holds the node', () => {
+  // fixed is set on pointer-down and cleared on pointer-up (app.js dropDrag).
+  // An anchor must not fight the pointer, or dragging an event would feel like
+  // pulling elastic against the hand.
+  const sim = F.createSim({ nodes: [{ id: 'a', anchor: { x: 0, y: 0 } }], edges: [] });
+  sim.nodes[0].fixed = true;
+  sim.nodes[0].x = 700; sim.nodes[0].y = 700;
+  F.settle(sim);
+  assert.strictEqual(sim.nodes[0].x, 700, 'a held node must stay exactly where the pointer put it');
+  assert.strictEqual(sim.nodes[0].y, 700);
+});
+
+test('a graph with no anchors ticks exactly as it did before anchors existed', () => {
+  // The reproducibility guarantee: the anchor force must be a no-op for every
+  // node that has none, so the existing layout is untouched.
+  const plain = F.createSim(g(['a', 'b', 'c', 'd'], [{ source: 'a', target: 'b' }]));
+  F.settle(plain);
+  const again = F.createSim(g(['a', 'b', 'c', 'd'], [{ source: 'a', target: 'b' }]));
+  F.settle(again);
+  plain.nodes.forEach((n, i) => {
+    assert.strictEqual(n.x, again.nodes[i].x);
+    assert.strictEqual(n.y, again.nodes[i].y);
+  });
+  assert.ok(plain.nodes.every(n => n.anchor === undefined), 'a plain graph must carry no anchors at all');
 });

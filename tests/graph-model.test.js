@@ -293,8 +293,14 @@ test("an event on today is linked to its day more heavily than an event on any o
   });
   const todayW = edge(g, 'event:20', 'date:2026-07-17').weight;
   const otherW = edge(g, 'event:21', 'date:2026-07-18').weight;
+  const catW = edge(g, 'event:21', 'cat:c1').weight;
   assert.ok(todayW > otherW, `today's day edge must be the heavier one: today ${todayW}, other day ${otherW}`);
-  assert.strictEqual(otherW, 1, `an ordinary day must keep the default weight, got ${otherW}`);
+  // Another day's events are gathered too — they have to sit just beyond their
+  // own day rather than 250px away in any direction — but never as tightly as
+  // today's. The default 1 now belongs to the links with no ring to hold: the
+  // category edge is the one that must stay ordinary.
+  assert.ok(otherW > 1, `another day must gather its own events too, got ${otherW}`);
+  assert.strictEqual(catW, 1, `a category edge must keep the default weight, got ${catW}`);
 });
 
 test('a task due today is linked to its day more heavily than a task due another day', () => {
@@ -308,7 +314,9 @@ test('a task due today is linked to its day more heavily than a task due another
   const todayW = edge(g, 'task:t20', 'date:2026-07-17').weight;
   const otherW = edge(g, 'task:t21', 'date:2026-07-20').weight;
   assert.ok(todayW > otherW, `today's task must be held closer: today ${todayW}, other day ${otherW}`);
-  assert.strictEqual(otherW, 1, `an ordinary due date must keep the default weight, got ${otherW}`);
+  // As with events: another due date gathers its own task to its ring, just not
+  // as tightly as today does.
+  assert.ok(otherW > 1, `another due date must gather its own task too, got ${otherW}`);
 });
 
 test("an event on today keeps the default weight on its category edge", () => {
@@ -571,4 +579,185 @@ test('buildGraph with no start at all builds nothing rather than NaN days', () =
 test('a malformed date key in events is skipped, not fatal', () => {
   const g = build({ events: { 'garbage': [{ _dbId: 40, catId: 'c1', title: 'X' }] } });
   assert.strictEqual(kindOf(g, 'event').length, 0);
+});
+
+// ── anchors: which ring and which direction each node belongs in ──────────────
+// The model does not move anything — the force layer does — but it decides
+// where everything belongs. These tests read that decision straight off the
+// nodes; the settled geometry it produces is measured in graph-force.test.js.
+
+const R = n => Math.hypot(n.anchor.x, n.anchor.y);
+const bearing = n => Math.atan2(n.anchor.y, n.anchor.x);
+// Smallest angle between two bearings, in radians — the circle wraps, so a
+// plain subtraction would call 350° and 10° twenty degrees apart or 340.
+const between = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
+const node = (g, id) => g.nodes.find(n => n.id === id);
+
+test('today itself takes no anchor — it is pinned, which outranks one', () => {
+  const g = build({ today: START });
+  assert.strictEqual(node(g, 'date:' + START).anchor, undefined,
+    'today must be left to the pin, not given a second opinion about where it goes');
+});
+
+test('every other day is anchored further out than the day before it', () => {
+  const g = build({ today: START });
+  const radii = [18, 19, 20, 21, 22, 23].map(d => R(node(g, 'date:' + k(d))));
+  for (let i = 1; i < radii.length; i++) {
+    assert.ok(radii[i] > radii[i - 1],
+      `each step out must be further from today; radii are [${radii.map(r => r.toFixed(1)).join(', ')}]`);
+  }
+});
+
+test('the other days are anchored on distinct bearings, not stacked on one', () => {
+  // The rings alone would let two days sit on the same line out of today, which
+  // is what lets clusters mix. Each day owns a sector.
+  const g = build({ today: START });
+  const days = [18, 19, 20, 21, 22, 23].map(d => node(g, 'date:' + k(d)));
+  for (let i = 0; i < days.length; i++) {
+    for (let j = i + 1; j < days.length; j++) {
+      const apart = between(bearing(days[i]), bearing(days[j]));
+      assert.ok(apart > 0.5,
+        `${days[i].key} and ${days[j].key} must face different ways, only ${apart.toFixed(3)} rad apart`);
+    }
+  }
+});
+
+test("an event on another day is anchored beyond its own day, not inside it", () => {
+  const g = build({ today: START, events: { [k(19)]: [{ _dbId: 60, catId: 'c1', title: 'A' }] } });
+  const day = node(g, 'date:' + k(19));
+  const ev = node(g, 'event:60');
+  assert.ok(R(ev) > R(day),
+    `an event must be anchored outside its day: event ${R(ev).toFixed(1)}, day ${R(day).toFixed(1)}`);
+});
+
+test("a task on another day is anchored beyond its own day too", () => {
+  const g = build({ today: START, tasks: [{ id: 't60', title: 'X', dueDate: k(21), done: false }] });
+  const day = node(g, 'date:' + k(21));
+  const t = node(g, 'task:t60');
+  assert.ok(R(t) > R(day),
+    `a task must be anchored outside its day: task ${R(t).toFixed(1)}, day ${R(day).toFixed(1)}`);
+});
+
+test("another day's events are anchored in that day's own direction", () => {
+  // Outward is only half of it. An event anchored outward but on some other
+  // bearing would drift into a neighbour's cluster.
+  const g = build({
+    today: START,
+    events: { [k(20)]: [{ _dbId: 61, catId: 'c1', title: 'A' }, { _dbId: 62, catId: 'c1', title: 'B' }] },
+    tasks: [{ id: 't61', title: 'X', dueDate: k(20), done: false }],
+  });
+  const day = node(g, 'date:' + k(20));
+  ['event:61', 'event:62', 'task:t61'].forEach(id => {
+    const apart = between(bearing(node(g, id)), bearing(day));
+    assert.ok(apart <= 0.36,
+      `${id} must sit inside its day's sector, ${apart.toFixed(3)} rad off its day's bearing`);
+  });
+});
+
+test("several events on one day fan out rather than stacking on one point", () => {
+  const g = build({
+    today: START,
+    events: { [k(22)]: [1, 2, 3, 4].map((n, i) => ({ _dbId: 70 + i, catId: 'c1', title: 'E' + n })) },
+  });
+  const seen = new Set([70, 71, 72, 73].map(i => node(g, 'event:' + i).anchor.x + ',' + node(g, 'event:' + i).anchor.y));
+  assert.strictEqual(seen.size, 4, 'four events on one day must get four different anchors');
+});
+
+test("today's own events and tasks are anchored inside every other day's ring", () => {
+  // "その日を中心して" — what today holds is the innermost thing on screen
+  // apart from today itself.
+  const g = build({
+    today: START,
+    events: { [START]: [{ _dbId: 80, catId: 'c1', title: 'A' }] },
+    tasks: [{ id: 't80', title: 'X', dueDate: START, done: false }],
+  });
+  const nearestDay = Math.min(...[18, 19, 20, 21, 22, 23].map(d => R(node(g, 'date:' + k(d)))));
+  ['event:80', 'task:t80'].forEach(id => {
+    assert.ok(R(node(g, id)) < nearestDay,
+      `${id} is anchored at ${R(node(g, id)).toFixed(1)}, outside the nearest day ring ${nearestDay.toFixed(1)}`);
+  });
+});
+
+test("the nearest day ring clears twice today's own ring", () => {
+  // The margin condition 3 actually rests on. An event of today's at radius rc,
+  // on the same bearing as tomorrow, is nearer tomorrow the moment rc > R1 - rc.
+  // Repulsion inflates today's ring as today fills up, so the headroom has to be
+  // real rather than incidental.
+  const g = build({ today: START, events: { [START]: [{ _dbId: 81, catId: 'c1', title: 'A' }] } });
+  const inner = R(node(g, 'event:81'));
+  const first = Math.min(...[18, 19, 20, 21, 22, 23].map(d => R(node(g, 'date:' + k(d)))));
+  assert.ok(first > 2 * inner,
+    `the first day ring (${first.toFixed(1)}) must clear twice today's ring (2 x ${inner.toFixed(1)})`);
+});
+
+test("a [[note]] joins today's ring, since it hangs off one of today's events", () => {
+  const g = build({ today: START, events: { [START]: [{ _dbId: 82, catId: 'c1', title: '[[議事録]] を書く' }] } });
+  const note = node(g, 'note:議事録');
+  const ev = node(g, 'event:82');
+  assert.ok(note.anchor, 'a note must be anchored like the rest of today');
+  assert.ok(Math.abs(R(note) - R(ev)) < 1e-9,
+    `a note shares today's ring: note ${R(note).toFixed(1)}, event ${R(ev).toFixed(1)}`);
+});
+
+test('a category is left unanchored, because it belongs to no single day', () => {
+  // Anchoring it into one day's sector would be a lie about a node that serves
+  // several. It is left to its links.
+  const g = build({
+    today: START,
+    events: { [START]: [{ _dbId: 83, catId: 'c1', title: 'A' }], [k(20)]: [{ _dbId: 84, catId: 'c1', title: 'B' }] },
+  });
+  assert.strictEqual(node(g, 'cat:c1').anchor, undefined, 'a category must stay free to sit among the days it serves');
+});
+
+test('with no today given, nothing is anchored at all', () => {
+  // The same clock-independence guard the pin, the star and the weights have:
+  // there are no rings without a centre to ring.
+  const g = build({
+    events: { [START]: [{ _dbId: 85, catId: 'c1', title: 'A' }] },
+    tasks: [{ id: 't85', title: 'X', dueDate: k(19), done: false }],
+  });
+  const anchored = g.nodes.filter(n => n.anchor);
+  assert.deepStrictEqual(anchored.map(n => n.id), [], 'omitting today must anchor nothing');
+});
+
+test('a today outside the window on screen anchors nothing', () => {
+  const g = build({ today: '2026-08-17', events: { [START]: [{ _dbId: 86, catId: 'c1', title: 'A' }] } });
+  const anchored = g.nodes.filter(n => n.anchor);
+  assert.deepStrictEqual(anchored.map(n => n.id), [], 'a day outside the window is not a centre');
+});
+
+test('every anchor is a finite pair of numbers', () => {
+  // A NaN here would spread through the physics to every node in one tick.
+  const g = build({
+    today: START,
+    events: { [START]: [{ _dbId: 87, catId: 'c1', title: 'A [[N]]' }], [k(23)]: [{ _dbId: 88, catId: 'c1', title: 'B' }] },
+    tasks: [{ id: 't87', title: 'X', dueDate: k(19), done: false }],
+  });
+  g.nodes.filter(n => n.anchor).forEach(n => {
+    assert.ok(Number.isFinite(n.anchor.x) && Number.isFinite(n.anchor.y),
+      `${n.id} has a non-finite anchor: ${JSON.stringify(n.anchor)}`);
+  });
+});
+
+test('no anchor lands on the origin, where today is pinned', () => {
+  // A node anchored at exactly (0, 0) would seed on top of today and trip the
+  // coincident-node guard — the same collision that once threw a month's
+  // bounding box out to 57,000px.
+  const g = build({
+    today: START,
+    events: { [START]: [{ _dbId: 89, catId: 'c1', title: 'A' }], [k(18)]: [{ _dbId: 90, catId: 'c1', title: 'B' }] },
+  });
+  g.nodes.filter(n => n.anchor).forEach(n => {
+    assert.ok(Math.hypot(n.anchor.x, n.anchor.y) > 1,
+      `${n.id} is anchored on top of today at ${JSON.stringify(n.anchor)}`);
+  });
+});
+
+test('the same input anchors the same way every build', () => {
+  const shape = () => build({
+    today: START,
+    events: { [k(19)]: [{ _dbId: 91, catId: 'c1', title: 'A' }, { _dbId: 92, catId: 'c2', title: 'B' }] },
+    tasks: [{ id: 't91', title: 'X', dueDate: k(19), done: false }],
+  }).nodes.map(n => n.id + ':' + (n.anchor ? n.anchor.x.toFixed(6) + ',' + n.anchor.y.toFixed(6) : '-')).join('|');
+  assert.strictEqual(shape(), shape(), 'the layout policy must be deterministic');
 });

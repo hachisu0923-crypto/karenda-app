@@ -37,32 +37,77 @@
   // ("その日から7日以内"): today plus the six days after it, not today + 7.
   var WINDOW_DAYS = 7;
 
-  // ── how far each of the other days sits from today ───────────────────────────
-  // "その日に関係すること次第で近くする" — relatedness here is nearness in time,
-  // so the week reads as rings around today: tomorrow innermost, the sixth day
-  // out at the rim.
+  // ── where every node belongs: rings and sectors around today ────────────────
+  // "その日を中心して、それ以外の日を離して、予定をそれぞれの日から外側に繋がる
+  // ように" — the picture is polar. Today is the origin; its own events sit on a
+  // tight ring around it; the other six days each own a ring further out and a
+  // sector of the circle; and a day's events and tasks sit beyond their own day,
+  // in that day's sector. So the distance from the centre means one thing (how
+  // far away in time) and the direction means another (which day this belongs
+  // to).
   //
-  // A weight is the only lever the model has over distance (the force layer
-  // makes a link's rest length linkDistance / weight), so to aim a link at a
-  // number of pixels the model has to know what it is dividing — hence this
-  // copy of graph-force's default linkDistance. It is a target, not a promise:
-  // repulsion from the rest of the graph moves the settled positions somewhat.
+  // Springs alone cannot say that. A link only constrains the distance between
+  // two nodes, so an event 250px from its day is as happy inside the ring as
+  // outside it, and two days' clusters are free to overlap. The model therefore
+  // gives each node an `anchor` — the world point it belongs at — and the force
+  // layer pulls it there while repulsion still spreads out whatever crowds. The
+  // links are kept in agreement with the anchors (rest length = the gap the
+  // anchors ask for) so the two forces never fight.
+  //
+  // A weight is how the model states a rest length (the force layer makes it
+  // linkDistance / weight), so to aim at a number of pixels the model has to
+  // know what it is dividing — hence this copy of graph-force's default
+  // linkDistance. Anchors are targets, not promises: repulsion from the rest of
+  // the graph moves the settled positions somewhat.
   var LINK_DISTANCE = 250;
-  // The nearest ring starts outside today's own cluster (TODAY_LINK_WEIGHT puts
-  // today's events and tasks at ~83px). If tomorrow came in closer than that,
-  // the picture would say tomorrow matters more than today's own schedule.
-  var NEAR_DAY_REST = 130;   // a gap of one day
-  var FAR_DAY_REST = 400;    // the widest gap the window holds
+  var TAU = Math.PI * 2;
+  // Slot zero points straight up, so the day after today reads as "12 o'clock"
+  // rather than starting wherever atan2 happens to.
+  var ANGLE_START = -Math.PI / 2;
 
-  // Rest length for a day `gap` days from today, in a window whose widest gap is
-  // `span`: linear from NEAR_DAY_REST to FAR_DAY_REST, so every step out is the
+  // Today's own events, tasks and notes: one ring just outside today itself.
+  // Same distance TODAY_LINK_WEIGHT already asked for, so anchor and spring agree.
+  var TODAY_RING = LINK_DISTANCE / TODAY_LINK_WEIGHT;   // ~83px
+
+  // The other days. The nearest ring starts well outside today's own cluster: if
+  // tomorrow came in closer, the picture would say tomorrow matters more than
+  // today's own schedule.
+  //
+  // "Well outside" is a measured number, not a taste. Today's ring holds however
+  // many events, tasks and notes today happens to have, and repulsion inflates
+  // it as they crowd (a day with 8 events, 8 notes and 4 tasks settles at ~100px
+  // rather than 83). An event of today's sitting at radius rc, on the same
+  // bearing as tomorrow, is nearer tomorrow than today the moment rc > R1 - rc.
+  // So the first ring must clear twice the inflated inner ring: 240 leaves room
+  // for an inner ring up to ~117px, which is a today of roughly two dozen items.
+  var NEAR_DAY_RING = 240;   // a gap of one day
+  var FAR_DAY_RING = 510;    // the widest gap the window holds
+
+  // How far beyond its own day a day's events and tasks sit, and how wide a
+  // sector they fan across (radians either side of the day's own direction).
+  // The gap has to clear the day-to-day ring spacing ((470-200)/5 = 54px) by
+  // enough that a cluster reads as belonging to its day rather than to the next
+  // ring out; the sector has to stay well inside the 60° each day owns.
+  var DAY_CHILD_GAP = 120;
+  var DAY_CHILD_SPREAD = 0.35;                          // ~20°
+  var DAY_CHILD_WEIGHT = LINK_DISTANCE / DAY_CHILD_GAP;
+
+  // Radius for a day `gap` days from today, in a window whose widest gap is
+  // `span`: linear from NEAR_DAY_RING to FAR_DAY_RING, so every step out is the
   // same step further away.
-  function dayLinkWeight(gap, span) {
-    var rest = span > 1
-      ? NEAR_DAY_REST + (FAR_DAY_REST - NEAR_DAY_REST) * (gap - 1) / (span - 1)
-      : NEAR_DAY_REST;
-    return LINK_DISTANCE / rest;
+  function dayRing(gap, span) {
+    return span > 1
+      ? NEAR_DAY_RING + (FAR_DAY_RING - NEAR_DAY_RING) * (gap - 1) / (span - 1)
+      : NEAR_DAY_RING;
   }
+
+  // The spring that holds a day at its ring: rest length = the ring's radius, so
+  // the link is already satisfied where the anchor wants the day to be.
+  function dayLinkWeight(gap, span) {
+    return LINK_DISTANCE / dayRing(gap, span);
+  }
+
+  function polar(r, a) { return { x: r * Math.cos(a), y: r * Math.sin(a) }; }
 
   // How big today's day node is drawn. nodeRadius clamps at 14, so today would
   // otherwise be indistinguishable from any well-connected node; the user asked
@@ -183,13 +228,26 @@
     // the days settle into rings. Weights below 1 are intended here: a distant
     // day is held by a long, slack spring, which is exactly "less related".
     var todayIdx = today ? windowKeys.indexOf(today) : -1;
+    var span = windowKeys.length - 1;                // the widest gap on show
+    // The other days, in window order. Their position in this list is the
+    // sector they get; their gap from today is the ring they get.
+    var others = [];
     if (todayIdx >= 0) {
-      var span = windowKeys.length - 1;              // the widest gap on show
       windowKeys.forEach(function (key, idx) {
-        var gap = Math.abs(idx - todayIdx);
-        if (gap === 0) return;                       // no self-loop on today
-        link('date:' + today, 'date:' + key, dayLinkWeight(gap, span));
+        if (idx === todayIdx) return;                // no self-loop on today
+        others.push({ key: key, gap: Math.abs(idx - todayIdx) });
       });
+      others.forEach(function (d) {
+        link('date:' + today, 'date:' + d.key, dayLinkWeight(d.gap, span));
+      });
+    }
+
+    // Rest length for an event or task hanging off `key`. Without a today on
+    // screen there are no rings, so nothing is gathered and every link is
+    // ordinary — the same clock-independence the pin and the star have.
+    function childWeight(key) {
+      if (todayIdx < 0) return 1;
+      return key === today ? TODAY_LINK_WEIGHT : DAY_CHILD_WEIGHT;
     }
 
     // ── event nodes ─────────────────────────────────────────────────────────
@@ -209,10 +267,12 @@
           color: cat ? cat.color : null,                   // unknown catId -> view decides
           key: key, ref: ev, degree: 0,
         });
-        // Today's events hug their day. The category edge stays weight 1 on
-        // purpose: pulling the category in too would drag along every other
-        // day's events that share it, and smear the cluster back out.
-        link(id, dateId, key === today ? TODAY_LINK_WEIGHT : 1);
+        // Today's events hug their day; another day's are held at the gap its
+        // anchor ring asks for, so the spring agrees with the anchor instead of
+        // pulling the cluster back to the default 250. The category edge stays
+        // weight 1 on purpose: pulling the category in too would drag along
+        // every other day's events that share it, and smear the cluster out.
+        link(id, dateId, childWeight(key));
         if (cat) {
           link(id, 'cat:' + cat.id);
           usedCats.add(cat.id);
@@ -250,7 +310,7 @@
       var dateId = 'date:' + t.dueDate;
       var id = 'task:' + t.id;
       add({ id: id, kind: 'task', label: stripInline(t.title || '(無題)'), key: t.dueDate, ref: t, degree: 0 });
-      link(id, dateId, t.dueDate === today ? TODAY_LINK_WEIGHT : 1);
+      link(id, dateId, childWeight(t.dueDate));
     });
 
     // ── category nodes ──────────────────────────────────────────────────────
@@ -260,6 +320,49 @@
       if (!usedCats.has(c.id)) return;
       add({ id: 'cat:' + c.id, kind: 'cat', label: c.name, color: c.color, ref: c, degree: 0 });
     });
+
+    // ── anchors: the world point each node belongs at ───────────────────────
+    // Done in one pass at the end, because a day's sector has to be shared out
+    // among its events and tasks and none of them exist until now.
+    //
+    // Today itself gets none — it is pinned, which the force layer honours over
+    // everything. Categories get none either: a category belongs to whichever
+    // days happen to use it, so pinning it to one sector would be a lie. It is
+    // left to its links, which is exactly the "somewhere in the middle of the
+    // days I serve" the physics already produces.
+    if (todayIdx >= 0) {
+      // Every event and task sits with its own day; a note hangs off one of
+      // today's events, so it joins today's ring. Insertion order (events, then
+      // tasks, then notes) decides who gets which slot — deterministic, so the
+      // same data lays out the same way every run.
+      var kids = new Map();
+      windowKeys.forEach(function (key) { kids.set(key, []); });
+      nodes.forEach(function (n) {
+        if (n.kind === 'note') kids.get(today).push(n);
+        else if ((n.kind === 'event' || n.kind === 'task') && kids.has(n.key)) kids.get(n.key).push(n);
+      });
+
+      // Today's own ring: a full circle, since nothing else is inside it to
+      // collide with.
+      var mine = kids.get(today);
+      mine.forEach(function (n, i) {
+        n.anchor = polar(TODAY_RING, ANGLE_START + TAU * i / mine.length);
+      });
+
+      // Each other day owns a ring and an equal slice of the circle, and its
+      // events and tasks fan out one step beyond it inside that slice — so they
+      // read as radiating outward from their day, away from the centre.
+      others.forEach(function (d, slot) {
+        var r = dayRing(d.gap, span);
+        var a = ANGLE_START + TAU * slot / others.length;
+        byId.get('date:' + d.key).anchor = polar(r, a);
+        var list = kids.get(d.key);
+        list.forEach(function (n, i) {
+          var off = list.length > 1 ? DAY_CHILD_SPREAD * (2 * i / (list.length - 1) - 1) : 0;
+          n.anchor = polar(r + DAY_CHILD_GAP, a + off);
+        });
+      });
+    }
 
     // Edges were emitted before their category node existed; drop any that
     // still dangle rather than leaving an edge to nowhere.

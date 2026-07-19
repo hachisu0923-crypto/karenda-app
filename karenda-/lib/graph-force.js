@@ -22,6 +22,14 @@
     repelStrength: 10,
     linkStrength: 1,
     linkDistance: 250,
+    // How hard a node with an `anchor` is held at it. A link only constrains
+    // the distance between two nodes; an anchor constrains a node's place, so
+    // the model can say "outside your day, in your day's direction" — see
+    // graph-model.js. It is deliberately not scaled down by the 0.1 the nudging
+    // forces use: at 0.1 a category's ordinary 250px spring would drag an
+    // anchored event hundreds of pixels off its ring, and the arrangement the
+    // model asked for would be advisory rather than real.
+    anchorStrength: 0.35,
   };
 
   var ALPHA_START = 1;
@@ -41,9 +49,12 @@
   // Deterministic on purpose: no seeded RNG to carry around, and the same
   // input lays out the same way every run, which is what makes it testable.
   //
-  // A pinned node starts where it will stay. It keeps its spiral index so every
-  // other node seeds exactly where it always has — moving the rest up a slot
-  // would change the whole layout of a month that merely contains today.
+  // A pinned or anchored node starts where it will stay. It keeps its spiral
+  // index so every other node seeds exactly where it always has — moving the
+  // rest up a slot would change the whole layout of a graph that merely
+  // contains today. Seeding at the anchor is not just tidy: from the spiral,
+  // 400 ticks of a decaying alpha is not always enough to travel 500px, so the
+  // arrangement the model asked for would only be half-arrived at first paint.
   function initLayout(nodes) {
     var PHI = Math.PI * (3 - Math.sqrt(5));
     nodes.forEach(function (n, i) {
@@ -53,6 +64,7 @@
       n.y = r * Math.sin(a);
       n.vx = 0;
       n.vy = 0;
+      if (n.anchor) { n.x = n.anchor.x; n.y = n.anchor.y; }
       if (n.pinned) { n.x = 0; n.y = 0; }
     });
     return nodes;
@@ -135,6 +147,16 @@
       var lx = dx * f, ly = dy * f;
       a.vx += lx; a.vy += ly;
       b.vx -= lx; b.vy -= ly;
+    }
+
+    // Anchors — a node the model placed is pulled back to its place. Nodes
+    // without one are untouched, so a graph that anchors nothing ticks exactly
+    // as it did before this force existed.
+    for (i = 0; i < n; i++) {
+      a = nodes[i];
+      if (!a.anchor) continue;
+      a.vx += (a.anchor.x - a.x) * o.anchorStrength * alpha;
+      a.vy += (a.anchor.y - a.y) * o.anchorStrength * alpha;
     }
 
     // Centering — pull everything toward the origin so it cannot drift away.

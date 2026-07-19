@@ -31,6 +31,10 @@ drop policy if exists "own projects" on public.projects;
 create policy "own projects" on public.projects
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+drop trigger if exists set_projects_updated_at on public.projects;
+create trigger set_projects_updated_at before update on public.projects
+  for each row execute function public.set_updated_at();
+
 -- タスクをプロジェクトに紐づける。null = 未分類。既存タスクの移行は要らない。
 -- projects への外部キーは張らない。既存のアプリ間テーブルが一貫して FK を
 -- 張らない方針（events.cat_id も FK ではない）に合わせる。プロジェクトは
